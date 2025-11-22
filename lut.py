@@ -177,6 +177,57 @@ def apply_lut(
             return result
 
 
+def write_cube_file(
+    lut_path: str,
+    lut_tensor: torch.Tensor,
+    domain_min: list = [0.0, 0.0, 0.0],
+    domain_max: list = [1.0, 1.0, 1.0],
+    title: str = "Generated LUT",
+) -> None:
+    """
+    Save a PyTorch LUT tensor to a .cube file
+
+    Args:
+        lut_path: Path where the .cube file will be saved
+        lut_tensor: LUT tensor of shape (size, size, size, 3)
+        domain_min: Minimum domain values (default [0.0, 0.0, 0.0])
+        domain_max: Maximum domain values (default [1.0, 1.0, 1.0])
+        title: Optional title for the LUT file
+    """
+    assert lut_tensor.ndim == 4, "LUT tensor must be 4D (size, size, size, 3)"
+    assert lut_tensor.shape[-1] == 3, "LUT tensor must have 3 channels (RGB)"
+    assert len(domain_min) == 3, "Domain min must be a 3-element list"
+    assert len(domain_max) == 3, "Domain max must be a 3-element list"
+    
+    lut_size = lut_tensor.shape[0]
+    
+    # Verify cube shape
+    assert lut_tensor.shape[0] == lut_tensor.shape[1] == lut_tensor.shape[2], \
+        "LUT must be cubic (same size in all dimensions)"
+    
+    with open(lut_path, "w") as f:
+        # Write header
+        f.write(f"# {title}\n")
+        f.write(f"# Generated with PyTorch LUT tools\n")
+        f.write(f"LUT_3D_SIZE {lut_size}\n")
+        
+        # Write domain info if not default
+        if domain_min != [0.0, 0.0, 0.0]:
+            f.write(f"DOMAIN_MIN {domain_min[0]:.6f} {domain_min[1]:.6f} {domain_min[2]:.6f}\n")
+        if domain_max != [1.0, 1.0, 1.0]:
+            f.write(f"DOMAIN_MAX {domain_max[0]:.6f} {domain_max[1]:.6f} {domain_max[2]:.6f}\n")
+        
+        f.write("\n")
+        
+        # Flatten LUT data in BGR indexing order (blue varies slowest, red fastest)
+        # The tensor is already in [B][G][R] order from our format
+        lut_data = lut_tensor.reshape(-1, 3).cpu()
+        
+        # Write RGB values, one per line
+        for rgb in lut_data:
+            f.write(f"{rgb[0]:.6f} {rgb[1]:.6f} {rgb[2]:.6f}\n")
+
+
 def identity_lut(resolution: int = 32) -> torch.Tensor:
     """
     Create identity LUT using meshgrid.
