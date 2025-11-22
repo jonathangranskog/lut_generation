@@ -243,3 +243,34 @@ def identity_lut(resolution: int = 32) -> torch.Tensor:
     b, g, r = torch.meshgrid(coords, coords, coords, indexing="ij")
     identity_lut = torch.stack([r, g, b], dim=-1)
     return identity_lut
+
+
+def lut_smoothness_loss(lut_tensor: torch.Tensor) -> torch.Tensor:
+    """
+    Compute smoothness loss for a 3D LUT using total variation.
+
+    Penalizes large differences between adjacent cells in the LUT,
+    encouraging smooth color transformations.
+
+    Args:
+        lut_tensor: LUT tensor of shape (B, G, R, 3)
+
+    Returns:
+        Scalar smoothness loss (sum of squared differences along each axis)
+    """
+    # Compute differences along each spatial dimension
+    # Shape: (B, G, R, 3)
+
+    # Difference along B (blue) axis
+    diff_b = lut_tensor[1:, :, :, :] - lut_tensor[:-1, :, :, :]
+
+    # Difference along G (green) axis
+    diff_g = lut_tensor[:, 1:, :, :] - lut_tensor[:, :-1, :, :]
+
+    # Difference along R (red) axis
+    diff_r = lut_tensor[:, :, 1:, :] - lut_tensor[:, :, :-1, :]
+
+    # Compute L2 norm of differences (sum of squared differences)
+    loss = (diff_b**2).mean() + (diff_g**2).mean() + (diff_r**2).mean()
+
+    return loss
