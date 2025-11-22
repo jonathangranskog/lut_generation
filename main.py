@@ -26,6 +26,7 @@ from utils.lut import (
     write_cube_file,
     image_smoothness_loss,
     image_regularization_loss,
+    black_level_preservation_loss,
 )
 from models.clip import CLIPLoss
 from utils.dataset import ImageDataset
@@ -114,11 +115,12 @@ def optimize(
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
     model_type: Annotated[ModelType, typer.Option(help="Model (clip)")] = "clip",
     lut_size: int = 32,
-    num_steps: int = 500,
+    steps: int = 500,
     batch_size: int = 4,
     learning_rate: float = 5e-3,
-    image_smoothness: float = 1.0,
-    image_regularization: float = 1.0,
+    image_smoothness: float = 10.0,
+    image_regularization: float = 10.0,
+    black_preservation: float = 10.0,
     log_interval: int = 50,
     verbose: bool = False,
     output_path: str = "lut.cube",
@@ -128,6 +130,7 @@ def optimize(
 
     Image smoothness penalizes banding and discontinuities in output images.
     Image regularization keeps output images close to input images (subtle changes).
+    Black preservation prevents faded/lifted blacks (maintains deep shadows).
     Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
     """
     # Select device
@@ -162,9 +165,9 @@ def optimize(
     optimizer = Adam([lut_tensor], lr=learning_rate)
 
     # Training loop
-    steps = 0
+    step = 0
     stop = False
-    pbar = tqdm(total=num_steps, desc="Optimizing LUT") if not verbose else None
+    pbar = tqdm(total=step, desc="Optimizing LUT") if not verbose else None
 
     # Create log directory based on prompt
     prompt_folder = sanitize_prompt_for_filename(prompt)
@@ -201,6 +204,11 @@ def optimize(
                 img_reg_loss = image_regularization_loss(transformed_images, images)
                 loss = loss + image_regularization * img_reg_loss
 
+            black_loss = None
+            if black_preservation > 0:
+                black_loss = black_level_preservation_loss(transformed_images, images)
+                loss = loss + black_preservation * black_loss
+
             # Optimize
             optimizer.zero_grad()
             loss.backward()
@@ -214,20 +222,20 @@ def optimize(
             with torch.no_grad():
                 lut_tensor.clamp_(0, 1)
 
-            steps += 1
+            step += 1
 
             # Save checkpoint every log_interval steps
-            if log_interval > 0 and steps % log_interval == 0:
+            if log_interval > 0 and step % log_interval == 0:
                 sample_image_device = sample_image_cpu.to(device)
                 save_training_checkpoint(
-                    steps, lut_tensor, sample_image_device, log_dir
+                    step, lut_tensor, sample_image_device, log_dir
                 )
                 if verbose:
                     print(f"  → Saved checkpoint to {log_dir}/")
 
             # Logging
-            if verbose and steps % 10 == 0:
-                log_msg = f"Step {steps}: Loss = {loss.item():.4f} (CLIP: {clip_loss.item():.4f}"
+            if verbose and step % 10 == 0:
+                log_msg = f"Step {step}: Loss = {loss.item():.4f} (CLIP: {clip_loss.item():.4f}"
                 if image_smoothness > 0 and img_smooth_loss is not None:
                     log_msg += (
                         f", Smooth: {(image_smoothness * img_smooth_loss).item():.4f}"
@@ -236,13 +244,17 @@ def optimize(
                     log_msg += (
                         f", Reg: {(image_regularization * img_reg_loss).item():.4f}"
                     )
+                if black_preservation > 0 and black_loss is not None:
+                    log_msg += (
+                        f", Black: {(black_preservation * black_loss).item():.4f}"
+                    )
                 log_msg += ")"
                 print(log_msg)
             elif pbar is not None:
                 pbar.update(1)
                 pbar.set_postfix({"loss": f"{loss.item():.4f}"})
 
-            if steps >= num_steps:
+            if step >= steps:
                 stop = True
                 break
 
@@ -252,7 +264,7 @@ def optimize(
     # Save final checkpoint
     if log_interval > 0:
         sample_image_device = sample_image_cpu.to(device)
-        save_training_checkpoint(steps, lut_tensor, sample_image_device, log_dir)
+        save_training_checkpoint(step, lut_tensor, sample_image_device, log_dir)
         print(f"Saved final checkpoint to {log_dir}/")
 
     print(f"\nOptimization complete! Final loss: {loss.item():.4f}")

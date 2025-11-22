@@ -36,7 +36,7 @@ uv sync
 uv run python main.py optimize \
   --prompt "golden hour warm sunlight" \
   --image-folder images_resized/ \
-  --num-steps 500
+  --steps 500
 ```
 
 This will:
@@ -68,7 +68,7 @@ uv run python main.py optimize [OPTIONS]
 
 **Key Options:**
 - `--lut-size INT`: LUT resolution (default: 32). Higher = smoother but slower (16, 32, 64)
-- `--num-steps INT`: Training iterations (default: 500)
+- `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
 - `--image-smoothness FLOAT`: Anti-banding strength (default: 1.0, range: 0.1-2.0)
 - `--image-regularization FLOAT`: Keep changes subtle (default: 1.0, range: 0.1-2.0)
@@ -83,7 +83,7 @@ uv run python main.py optimize \
   --prompt "cinematic teal and orange" \
   --image-folder images_resized/ \
   --lut-size 32 \
-  --num-steps 500 \
+  --steps 500 \
   --learning-rate 0.005 \
   --image-smoothness 1.0 \
   --image-regularization 1.0 \

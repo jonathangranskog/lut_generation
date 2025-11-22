@@ -275,15 +275,65 @@ def image_regularization_loss(
 ) -> torch.Tensor:
     """
     Penalize deviation from original images.
-
+    
     Encourages the LUT to make subtle adjustments rather than
     extreme transformations.
-
+    
     Args:
         transformed_images: LUT-transformed images, shape (B, C, H, W)
         original_images: Original input images, shape (B, C, H, W)
-
+    
     Returns:
         Scalar loss (MSE between original and transformed images)
     """
     return torch.nn.functional.mse_loss(transformed_images, original_images)
+
+
+def black_level_preservation_loss(
+    transformed_images: torch.Tensor, original_images: torch.Tensor, threshold: float = 0.1
+) -> torch.Tensor:
+    """
+    Preserve black levels - penalize lifting of dark pixels.
+    
+    Prevents the common issue of faded/lifted blacks by penalizing when
+    dark pixels in the input become brighter in the output.
+    
+    Args:
+        transformed_images: LUT-transformed images, shape (B, C, H, W)
+        original_images: Original input images, shape (B, C, H, W)
+        threshold: Brightness threshold below which pixels are considered "dark"
+                   (default: 0.1, range [0, 1])
+    
+    Returns:
+        Scalar loss penalizing lifted blacks
+    """
+    # Compute luminance (approximate perceptual brightness)
+    # Using Rec. 709 luma coefficients: Y = 0.2126*R + 0.7152*G + 0.0722*B
+    orig_luma = (
+        0.2126 * original_images[:, 0, :, :]
+        + 0.7152 * original_images[:, 1, :, :]
+        + 0.0722 * original_images[:, 2, :, :]
+    )
+    
+    trans_luma = (
+        0.2126 * transformed_images[:, 0, :, :]
+        + 0.7152 * transformed_images[:, 1, :, :]
+        + 0.0722 * transformed_images[:, 2, :, :]
+    )
+    
+    # Create mask for dark pixels in original image
+    dark_mask = (orig_luma < threshold).float()
+    
+    # Compute how much dark pixels have been lifted
+    # Only penalize when transformed > original (lifting blacks)
+    lift = torch.relu(trans_luma - orig_luma)
+    
+    # Apply mask and compute loss only on dark regions
+    masked_lift = lift * dark_mask
+    
+    # Return mean lift in dark regions
+    # Add small epsilon to avoid division by zero if no dark pixels
+    num_dark_pixels = dark_mask.sum() + 1e-6
+    loss = masked_lift.sum() / num_dark_pixels
+    
+    return loss
