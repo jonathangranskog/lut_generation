@@ -91,19 +91,39 @@ def apply_lut(
     Apply a 3D LUT using PyTorch's grid_sample for trilinear interpolation
 
     Args:
-        image: Input image tensor, either (C, H, W) or (H, W, C) format
+        image: Input image tensor in one of the following formats:
+               - (C, H, W): Single image, channels first
+               - (H, W, C): Single image, channels last
+               - (B, C, H, W): Batch of images, channels first
+               - (B, H, W, C): Batch of images, channels last
         lut_tensor: LUT tensor of shape (size, size, size, 3)
         domain_min: Minimum domain values for scaling (default [0.0, 0.0, 0.0])
         domain_max: Maximum domain values for scaling (default [1.0, 1.0, 1.0])
 
     Returns:
-        LUT-applied image in the same format as input
+        LUT-applied image(s) in the same format as input
     """
-    # Ensure image is in (H, W, C) format
-    if image.shape[0] == 3:  # (C, H, W)
-        x = image.permute(1, 2, 0)
+    original_shape = image.shape
+    is_batched = image.ndim == 4
+
+    # Normalize to (B, H, W, C) format
+    if is_batched:
+        if image.shape[1] == 3:  # (B, C, H, W)
+            x = image.permute(0, 2, 3, 1)
+            channels_first = True
+        else:  # (B, H, W, C)
+            x = image
+            channels_first = False
     else:
-        x = image
+        # Add batch dimension for single image
+        if image.shape[0] == 3:  # (C, H, W)
+            x = image.permute(1, 2, 0).unsqueeze(0)
+            channels_first = True
+        else:  # (H, W, C)
+            x = image.unsqueeze(0)
+            channels_first = False
+
+    B, H, W, C = x.shape
 
     # Apply domain scaling if provided
     assert len(domain_min) == 3, "Domain min must be a 3-element list"
@@ -112,15 +132,15 @@ def apply_lut(
     domain_max_t = torch.tensor(domain_max).to(x.device)
     domain_scaled = (x - domain_min_t) / (domain_max_t - domain_min_t)
 
-    # Delta-based approach for HDR extrapolation:
-    # Sample LUT at clamped coordinates, compute delta from identity,
-    # then apply delta to unclamped input to preserve HDR values
+    # Clamp coordinates for LUT lookup
     clamped_coords = torch.clamp(domain_scaled, 0, 1)
 
     # Prepare for grid_sample: need (N, C, D, H, W) and grid (N, D_out, H_out, W_out, 3)
     # LUT is indexed as [B][G][R] (cube file format), so we maintain that order
     # permute(3, 0, 1, 2) transforms (B, G, R, 3) -> (3, B, G, R)
     lut = lut_tensor.permute(3, 0, 1, 2).unsqueeze(0).to(x.device)  # (1, 3, B, G, R)
+    # Expand LUT for batch size
+    lut = lut.expand(B, -1, -1, -1, -1)  # (B, 3, B, G, R)
 
     # Convert RGB coordinates to BGR for LUT indexing (matches GLSL shader's color.bgr)
     clamped_coords_bgr = clamped_coords.flip(-1)
@@ -129,26 +149,32 @@ def apply_lut(
     # Scale from [0, 1] to [-1, 1]
     coords = clamped_coords_bgr * 2.0 - 1.0
 
-    # Reshape coordinates to (1, H*W, 1, 1, 3) for sampling
-    H, W = domain_scaled.shape[:2]
-    coords = coords.view(1, H * W, 1, 1, 3)
+    # Reshape coordinates to (B, H*W, 1, 1, 3) for sampling
+    coords = coords.view(B, H * W, 1, 1, 3)
 
     # Sample the LUT with trilinear interpolation
     lut_sampled = torch.nn.functional.grid_sample(
         lut, coords, mode="bilinear", padding_mode="border", align_corners=False
     )
 
-    # Reshape LUT output back to (H, W, 3) from (3, H * W)
-    lut_sampled = lut_sampled.squeeze().permute(1, 0).view(H, W, 3)
+    # Reshape LUT output back to (B, H, W, 3)
+    lut_sampled = lut_sampled.view(B, 3, H, W).permute(0, 2, 3, 1)
 
     # Flip the result to match the original color space
     result = lut_sampled.flip(-1)
 
     # Return in original format
-    if image.shape[0] == 3:
-        return result.permute(2, 0, 1)
+    if not is_batched:
+        result = result.squeeze(0)  # Remove batch dimension
+        if channels_first:
+            return result.permute(2, 0, 1)
+        else:
+            return result
     else:
-        return result
+        if channels_first:
+            return result.permute(0, 3, 1, 2)
+        else:
+            return result
 
 
 def identity_lut(resolution: int = 32) -> torch.Tensor:

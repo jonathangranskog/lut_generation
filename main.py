@@ -5,7 +5,7 @@ This script allows you to optimize a LUT given a small dataset of images and a p
 
 It can use either CLIP, Score Distillation Sampling or VLMs to optimize the LUT.
 
-Using the `infer` command, this script will apply a LUT to an image. 
+Using the `infer` command, this script will apply a LUT to an image.
 """
 
 import torch
@@ -21,6 +21,7 @@ from lut import read_cube_file, apply_lut, identity_lut
 ModelType = Literal["clip", "sds", "vlm"]
 
 app = typer.Typer()
+
 
 @app.command()
 def optimize(
@@ -38,6 +39,7 @@ def optimize(
     Optimize a LUT given a small dataset of images and a prompt.
     """
     pass
+
 
 @app.command()
 def infer(
@@ -71,12 +73,13 @@ def infer(
     image = image.convert("RGB")
     image_tensor = torch.from_numpy(np.array(image)).permute(2, 0, 1)
     image_tensor = image_tensor.float() / 255.0
-    image_tensor = image_tensor.to(device)
+    image_tensor = image_tensor.to(device).unsqueeze(0)
     image_tensor = apply_lut(image_tensor, lut_tensor, domain_min, domain_max)
-    image_tensor = image_tensor.permute(1, 2, 0).clamp(0, 1)
+    image_tensor = image_tensor.squeeze(0).permute(1, 2, 0).clamp(0, 1)
     image_tensor = (image_tensor * 255.0).round().to(torch.uint8).cpu().numpy()
     image = Image.fromarray(image_tensor)
     image.save(output_path)
+
 
 if __name__ == "__main__":
     app()
