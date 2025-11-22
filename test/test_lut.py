@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lut import read_cube_file, write_cube_file, apply_lut, identity_lut
+from utils.lut import read_cube_file, write_cube_file, apply_lut, identity_lut
 
 
 def create_gradient_image(width=256, height=256):

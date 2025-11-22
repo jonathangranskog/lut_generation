@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image
 from typing import Literal
 from typing_extensions import Annotated
-from lut import (
+from utils.lut import (
     read_cube_file,
     apply_lut,
     identity_lut,
@@ -24,7 +24,7 @@ from lut import (
     lut_smoothness_loss,
 )
 from models.clip import CLIPLoss
-from dataset import ImageDataset
+from utils.dataset import ImageDataset
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.nn.functional import mse_loss
