@@ -11,9 +11,10 @@ from transformers import CLIPModel, CLIPTokenizer
 
 class CLIPLoss(nn.Module):
     """
-    CLIP-based L2 loss for image-text alignment.
+    CLIP-based cosine similarity loss for image-text alignment.
 
-    Computes the L2 distance between CLIP image embeddings and text embeddings.
+    Computes 1 - cosine_similarity between CLIP image embeddings and text embeddings.
+    Loss range: [0, 2], typically [0, 1]. Lower loss = higher similarity.
     """
 
     def __init__(
@@ -56,7 +57,7 @@ class CLIPLoss(nn.Module):
             ).to(device)
 
             text_features = self.model.get_text_features(**text_inputs)
-            # Normalize text embeddings (CLIP embeddings are typically normalized)
+            # Normalize text embedding for cosine similarity
             self.text_embedding = text_features / text_features.norm(
                 dim=-1, keepdim=True
             )
@@ -99,13 +100,13 @@ class CLIPLoss(nn.Module):
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         """
-        Compute CLIP L2 loss between images and text prompt.
+        Compute CLIP cosine similarity loss between images and text prompt.
 
         Args:
             images: Batch of images in [0, 1] range, shape (B, C, H, W)
 
         Returns:
-            Scalar loss value (mean L2 distance across batch)
+            Scalar loss value (1 - mean cosine similarity across batch)
         """
         # Preprocess images for CLIP (differentiable)
         processed_images = self.preprocess_images(images)
@@ -113,15 +114,19 @@ class CLIPLoss(nn.Module):
         # Get image embeddings (gradients flow through images, not CLIP params)
         image_features = self.model.get_image_features(pixel_values=processed_images)
 
-        # Normalize image embeddings
+        # Normalize embeddings (required for cosine similarity)
         image_embeddings = image_features / image_features.norm(dim=-1, keepdim=True)
 
-        # Compute L2 loss between image and text embeddings
-        # Shape: (B, D) - (1, D) -> (B, D)
-        l2_loss = torch.norm(image_embeddings - self.text_embedding, dim=-1)
+        # Compute cosine similarity (dot product of normalized vectors)
+        # Shape: (B, D) * (1, D) -> (B,)
+        cosine_sim = (image_embeddings * self.text_embedding).sum(dim=-1)
+
+        # Convert to loss: 1 - similarity (range: [0, 2], typically [0, 1])
+        # Lower is better (high similarity = low loss)
+        loss = 1.0 - cosine_sim
 
         # Return mean loss across batch
-        return l2_loss.mean()
+        return loss.mean()
 
     def compute_similarity(self, images: torch.Tensor) -> torch.Tensor:
         """
@@ -139,6 +144,7 @@ class CLIPLoss(nn.Module):
             image_features = self.model.get_image_features(
                 pixel_values=processed_images
             )
+            # Normalize image embeddings for cosine similarity
             image_embeddings = image_features / image_features.norm(
                 dim=-1, keepdim=True
             )

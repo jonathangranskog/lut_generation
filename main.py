@@ -25,6 +25,8 @@ from utils.lut import (
     identity_lut,
     write_cube_file,
     lut_smoothness_loss,
+    image_smoothness_loss,
+    image_regularization_loss,
 )
 from models.clip import CLIPLoss
 from utils.dataset import ImageDataset
@@ -113,12 +115,14 @@ def optimize(
     prompt: Annotated[str, typer.Option(help="The prompt to optimize the LUT for.")],
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
     model_type: Annotated[ModelType, typer.Option(help="Model (clip)")] = "clip",
-    lut_size: int = 16,
+    lut_size: int = 32,
     num_steps: int = 500,
     batch_size: int = 4,
-    learning_rate: float = 1e-2,
-    regularization: float = 0.0,
-    smoothness: float = 1e-4,
+    learning_rate: float = 5e-3,
+    regularization: float = 1e-3,
+    smoothness: float = 5e-2,
+    image_smoothness: float = 1e-3,
+    image_regularization: float = 1e-3,
     log_interval: int = 50,
     verbose: bool = False,
     output_path: str = "lut.cube",
@@ -126,8 +130,10 @@ def optimize(
     """
     Optimize a LUT given a small dataset of images and a prompt.
 
-    Regularization keeps LUT close to identity.
-    Smoothness penalizes abrupt changes between adjacent LUT cells.
+    Regularization keeps LUT close to identity (LUT-space).
+    Smoothness penalizes abrupt changes between adjacent LUT cells (LUT-space).
+    Image smoothness penalizes banding in output images (image-space).
+    Image regularization keeps outputs close to inputs (image-space).
     Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
     """
     # Select device
@@ -190,22 +196,36 @@ def optimize(
             clip_loss = loss_fn(transformed_images)
             loss = clip_loss
 
-            # Add regularization to keep LUT close to identity
+            # LUT-space losses
             reg_loss = None
             if regularization > 0:
                 identity = identity_lut(lut_size).to(device)
                 reg_loss = mse_loss(lut_tensor, identity)
                 loss = loss + regularization * reg_loss
 
-            # Add smoothness regularization to encourage smooth transitions
             smooth_loss = None
             if smoothness > 0:
                 smooth_loss = lut_smoothness_loss(lut_tensor)
                 loss = loss + smoothness * smooth_loss
 
+            # Image-space losses (directly penalize artifacts in output images)
+            img_smooth_loss = None
+            if image_smoothness > 0:
+                img_smooth_loss = image_smoothness_loss(transformed_images)
+                loss = loss + image_smoothness * img_smooth_loss
+
+            img_reg_loss = None
+            if image_regularization > 0:
+                img_reg_loss = image_regularization_loss(transformed_images, images)
+                loss = loss + image_regularization * img_reg_loss
+
             # Optimize
             optimizer.zero_grad()
             loss.backward()
+
+            # Clip gradients to prevent extreme updates (reduces banding)
+            torch.nn.utils.clip_grad_norm_([lut_tensor], max_norm=1.0)
+
             optimizer.step()
 
             # Clamp LUT to valid range [0, 1]
@@ -227,9 +247,15 @@ def optimize(
             if verbose and steps % 10 == 0:
                 log_msg = f"Step {steps}: Loss = {loss.item():.4f} (CLIP: {clip_loss.item():.4f}"
                 if regularization > 0 and reg_loss is not None:
-                    log_msg += f", Reg: {(regularization * reg_loss).item():.4f}"
+                    log_msg += f", LUT-Reg: {(regularization * reg_loss).item():.4f}"
                 if smoothness > 0 and smooth_loss is not None:
-                    log_msg += f", Smooth: {(smoothness * smooth_loss).item():.4f}"
+                    log_msg += f", LUT-Smooth: {(smoothness * smooth_loss).item():.4f}"
+                if image_smoothness > 0 and img_smooth_loss is not None:
+                    log_msg += f", Img-Smooth: {(image_smoothness * img_smooth_loss).item():.4f}"
+                if image_regularization > 0 and img_reg_loss is not None:
+                    log_msg += (
+                        f", Img-Reg: {(image_regularization * img_reg_loss).item():.4f}"
+                    )
                 log_msg += ")"
                 print(log_msg)
             elif pbar is not None:

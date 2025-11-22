@@ -274,3 +274,47 @@ def lut_smoothness_loss(lut_tensor: torch.Tensor) -> torch.Tensor:
     loss = (diff_b**2).mean() + (diff_g**2).mean() + (diff_r**2).mean()
 
     return loss
+
+
+def image_smoothness_loss(images: torch.Tensor) -> torch.Tensor:
+    """
+    Compute total variation (smoothness) loss on images.
+
+    Penalizes abrupt changes between adjacent pixels, preventing banding
+    and other discontinuities in the output images.
+
+    Args:
+        images: Batch of images, shape (B, C, H, W)
+
+    Returns:
+        Scalar smoothness loss (mean squared differences across spatial dims)
+    """
+    # Compute differences along height (vertical)
+    diff_h = images[:, :, 1:, :] - images[:, :, :-1, :]
+
+    # Compute differences along width (horizontal)
+    diff_w = images[:, :, :, 1:] - images[:, :, :, :-1]
+
+    # Total variation loss (L2)
+    loss = (diff_h**2).mean() + (diff_w**2).mean()
+
+    return loss
+
+
+def image_regularization_loss(
+    transformed_images: torch.Tensor, original_images: torch.Tensor
+) -> torch.Tensor:
+    """
+    Penalize deviation from original images.
+
+    Encourages the LUT to make subtle adjustments rather than
+    extreme transformations.
+
+    Args:
+        transformed_images: LUT-transformed images, shape (B, C, H, W)
+        original_images: Original input images, shape (B, C, H, W)
+
+    Returns:
+        Scalar loss (MSE between original and transformed images)
+    """
+    return torch.nn.functional.mse_loss(transformed_images, original_images)
