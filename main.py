@@ -16,9 +16,15 @@ import numpy as np
 from PIL import Image
 from typing import Literal
 from typing_extensions import Annotated
-from lut import read_cube_file, apply_lut
+from lut import read_cube_file, apply_lut, identity_lut, write_cube_file
+from models.clip import CLIPLoss
+from dataset import ImageDataset
+from torch.utils.data import DataLoader
+from torch.optim import Adam
+from torch.nn.functional import mse_loss
+from tqdm import tqdm
 
-ModelType = Literal["clip", "sds", "vlm"]
+ModelType = Literal["clip"]
 
 app = typer.Typer()
 
@@ -27,18 +33,102 @@ app = typer.Typer()
 def optimize(
     prompt: Annotated[str, typer.Option(help="The prompt to optimize the LUT for.")],
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
-    model: Annotated[ModelType, typer.Option(help="Model (clip, sds, vlm)")] = "clip",
+    model_type: Annotated[ModelType, typer.Option(help="Model (clip)")] = "clip",
     lut_size: int = 16,
     num_steps: int = 500,
-    batch_size: int = 1,
-    learning_rate: float = 1e-4,
+    batch_size: int = 4,
+    learning_rate: float = 1e-2,
+    regularization: float = 0.0,
     verbose: bool = False,
     output_path: str = "lut.cube",
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
     """
-    pass
+    # Select device
+    # Note: MPS doesn't support grid_sampler_3d_backward, so use CUDA or CPU
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+    print(f"Using device: {device}")
+
+    # Create dataset
+    dataset = ImageDataset(image_folder)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    print(f"Loaded {len(dataset)} images from {image_folder}")
+
+    # Create loss function
+    if model_type == "clip":
+        loss_fn = CLIPLoss(prompt, device=device)
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
+
+    # Create LUT (trainable!)
+    lut_tensor = identity_lut(lut_size).to(device)
+    lut_tensor.requires_grad = True
+
+    # Create optimizer for LUT parameters
+    optimizer = Adam([lut_tensor], lr=learning_rate)
+
+    # Training loop
+    steps = 0
+    stop = False
+    pbar = tqdm(total=num_steps, desc="Optimizing LUT") if not verbose else None
+
+    while not stop:
+        for images in dataloader:
+            images = images.to(device)
+
+            # Apply LUT to images
+            transformed_images = apply_lut(images, lut_tensor)
+
+            # Compute loss
+            loss = loss_fn(transformed_images)
+
+            # Add regularization to keep LUT close to identity
+            if regularization > 0:
+                identity = identity_lut(lut_size).to(device)
+                reg_loss = mse_loss(lut_tensor, identity)
+                loss = loss + regularization * reg_loss
+
+            # Optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Clamp LUT to valid range [0, 1]
+            with torch.no_grad():
+                lut_tensor.clamp_(0, 1)
+
+            steps += 1
+
+            # Logging
+            if verbose and steps % 10 == 0:
+                print(f"Step {steps}: Loss = {loss.item():.4f}")
+            elif pbar is not None:
+                pbar.update(1)
+                pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+
+            if steps >= num_steps:
+                stop = True
+                break
+
+    if pbar is not None:
+        pbar.close()
+    print(f"\nOptimization complete! Final loss: {loss.item():.4f}")
+
+    # Save LUT
+    domain_min = [0.0, 0.0, 0.0]
+    domain_max = [1.0, 1.0, 1.0]
+    write_cube_file(
+        output_path,
+        lut_tensor.detach().cpu(),
+        domain_min,
+        domain_max,
+        title=f"CLIP: {prompt}",
+    )
+    print(f"LUT saved to {output_path}")
 
 
 @app.command()
