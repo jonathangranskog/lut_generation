@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image
 from typing import Literal
 from typing_extensions import Annotated
-from lut import read_cube_file, write_cube_file, apply_lut, identity_lut
+from lut import read_cube_file, apply_lut
 
 ModelType = Literal["clip", "sds", "vlm"]
 

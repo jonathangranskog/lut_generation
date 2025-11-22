@@ -103,7 +103,6 @@ def apply_lut(
     Returns:
         LUT-applied image(s) in the same format as input
     """
-    original_shape = image.shape
     is_batched = image.ndim == 4
 
     # Normalize to (B, H, W, C) format
@@ -198,31 +197,36 @@ def write_cube_file(
     assert lut_tensor.shape[-1] == 3, "LUT tensor must have 3 channels (RGB)"
     assert len(domain_min) == 3, "Domain min must be a 3-element list"
     assert len(domain_max) == 3, "Domain max must be a 3-element list"
-    
+
     lut_size = lut_tensor.shape[0]
-    
+
     # Verify cube shape
-    assert lut_tensor.shape[0] == lut_tensor.shape[1] == lut_tensor.shape[2], \
+    assert lut_tensor.shape[0] == lut_tensor.shape[1] == lut_tensor.shape[2], (
         "LUT must be cubic (same size in all dimensions)"
-    
+    )
+
     with open(lut_path, "w") as f:
         # Write header
         f.write(f"# {title}\n")
-        f.write(f"# Generated with PyTorch LUT tools\n")
+        f.write("# Generated with PyTorch LUT tools\n")
         f.write(f"LUT_3D_SIZE {lut_size}\n")
-        
+
         # Write domain info if not default
         if domain_min != [0.0, 0.0, 0.0]:
-            f.write(f"DOMAIN_MIN {domain_min[0]:.6f} {domain_min[1]:.6f} {domain_min[2]:.6f}\n")
+            f.write(
+                f"DOMAIN_MIN {domain_min[0]:.6f} {domain_min[1]:.6f} {domain_min[2]:.6f}\n"
+            )
         if domain_max != [1.0, 1.0, 1.0]:
-            f.write(f"DOMAIN_MAX {domain_max[0]:.6f} {domain_max[1]:.6f} {domain_max[2]:.6f}\n")
-        
+            f.write(
+                f"DOMAIN_MAX {domain_max[0]:.6f} {domain_max[1]:.6f} {domain_max[2]:.6f}\n"
+            )
+
         f.write("\n")
-        
+
         # Flatten LUT data in BGR indexing order (blue varies slowest, red fastest)
         # The tensor is already in [B][G][R] order from our format
         lut_data = lut_tensor.reshape(-1, 3).cpu()
-        
+
         # Write RGB values, one per line
         for rgb in lut_data:
             f.write(f"{rgb[0]:.6f} {rgb[1]:.6f} {rgb[2]:.6f}\n")
