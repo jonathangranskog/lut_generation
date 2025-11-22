@@ -26,6 +26,7 @@ cd lut_generation
 
 # Install dependencies
 uv sync
+```
 
 ## Quick Start
 
