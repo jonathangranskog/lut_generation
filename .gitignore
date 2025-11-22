@@ -3,3 +3,6 @@
 *.jpeg
 *.cube
 __pycache__/
+images/
+images_resized/
+.DS_Store
