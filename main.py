@@ -87,6 +87,77 @@ def load_image_as_tensor(image_path: str) -> torch.Tensor:
     return image_tensor
 
 
+def compute_losses(
+    loss_fn,
+    transformed_images: torch.Tensor,
+    original_images: torch.Tensor,
+    lut_tensor: torch.Tensor,
+    image_smoothness: float,
+    image_regularization: float,
+    black_preservation: float,
+    lut_smoothness: float,
+) -> tuple[torch.Tensor, dict]:
+    """
+    Compute all losses for LUT optimization.
+
+    Returns:
+        Tuple of (total_loss, loss_components_dict)
+    """
+    clip_loss = loss_fn(transformed_images)
+    loss = clip_loss
+    loss_components = {"clip": clip_loss}
+
+    if image_smoothness > 0:
+        img_smooth_loss = image_smoothness_loss(transformed_images)
+        loss = loss + image_smoothness * img_smooth_loss
+        loss_components["img_smooth"] = img_smooth_loss
+
+    if image_regularization > 0:
+        img_reg_loss = image_regularization_loss(transformed_images, original_images)
+        loss = loss + image_regularization * img_reg_loss
+        loss_components["img_reg"] = img_reg_loss
+
+    if black_preservation > 0:
+        black_loss = black_level_preservation_loss(transformed_images, original_images)
+        loss = loss + black_preservation * black_loss
+        loss_components["black"] = black_loss
+
+    if lut_smoothness > 0:
+        lut_smooth_loss = lut_smoothness_loss(lut_tensor)
+        loss = loss + lut_smoothness * lut_smooth_loss
+        loss_components["lut_smooth"] = lut_smooth_loss
+
+    return loss, loss_components
+
+
+def format_loss_log(
+    step: int,
+    total_loss: torch.Tensor,
+    loss_components: dict,
+    image_smoothness: float,
+    image_regularization: float,
+    black_preservation: float,
+    lut_smoothness: float,
+) -> str:
+    """Format a detailed loss log message."""
+    log_msg = f"Step {step}: Loss = {total_loss.item():.4f} (CLIP: {loss_components['clip'].item():.4f}"
+
+    if image_smoothness > 0 and "img_smooth" in loss_components:
+        log_msg += f", Smooth: {(image_smoothness * loss_components['img_smooth']).item():.4f}"
+
+    if image_regularization > 0 and "img_reg" in loss_components:
+        log_msg += f", Reg: {(image_regularization * loss_components['img_reg']).item():.4f}"
+
+    if black_preservation > 0 and "black" in loss_components:
+        log_msg += f", Black: {(black_preservation * loss_components['black']).item():.4f}"
+
+    if lut_smoothness > 0 and "lut_smooth" in loss_components:
+        log_msg += f", LUT Smooth: {(lut_smoothness * loss_components['lut_smooth']).item():.4f}"
+
+    log_msg += ")"
+    return log_msg
+
+
 def save_training_checkpoint(
     step: int,
     lut_tensor: torch.Tensor,
@@ -211,29 +282,17 @@ def optimize(
             # Apply LUT to images
             transformed_images = apply_lut(images, lut_tensor)
 
-            # Compute CLIP loss
-            clip_loss = loss_fn(transformed_images)
-            loss = clip_loss
-
-            # Image-space losses (directly penalize artifacts in output images)
-            img_smooth_loss = None
-            if image_smoothness > 0:
-                img_smooth_loss = image_smoothness_loss(transformed_images)
-                loss = loss + image_smoothness * img_smooth_loss
-
-            img_reg_loss = None
-            if image_regularization > 0:
-                img_reg_loss = image_regularization_loss(transformed_images, images)
-                loss = loss + image_regularization * img_reg_loss
-
-            black_loss = None
-            if black_preservation > 0:
-                black_loss = black_level_preservation_loss(transformed_images, images)
-                loss = loss + black_preservation * black_loss
-
-            if lut_smoothness > 0:
-                lut_smooth_loss = lut_smoothness_loss(lut_tensor)
-                loss = loss + lut_smoothness * lut_smooth_loss
+            # Compute all losses
+            loss, loss_components = compute_losses(
+                loss_fn,
+                transformed_images,
+                images,
+                lut_tensor,
+                image_smoothness,
+                image_regularization,
+                black_preservation,
+                lut_smoothness,
+            )
 
             # Optimize
             optimizer.zero_grad()
@@ -261,24 +320,15 @@ def optimize(
 
             # Logging
             if verbose and step % 10 == 0:
-                log_msg = f"Step {step}: Loss = {loss.item():.4f} (CLIP: {clip_loss.item():.4f}"
-                if image_smoothness > 0 and img_smooth_loss is not None:
-                    log_msg += (
-                        f", Smooth: {(image_smoothness * img_smooth_loss).item():.4f}"
-                    )
-                if image_regularization > 0 and img_reg_loss is not None:
-                    log_msg += (
-                        f", Reg: {(image_regularization * img_reg_loss).item():.4f}"
-                    )
-                if black_preservation > 0 and black_loss is not None:
-                    log_msg += (
-                        f", Black: {(black_preservation * black_loss).item():.4f}"
-                    )
-                if lut_smoothness > 0 and lut_smooth_loss is not None:
-                    log_msg += (
-                        f", LUT Smooth: {(lut_smoothness * lut_smooth_loss).item():.4f}"
-                    )
-                log_msg += ")"
+                log_msg = format_loss_log(
+                    step,
+                    loss,
+                    loss_components,
+                    image_smoothness,
+                    image_regularization,
+                    black_preservation,
+                    lut_smoothness,
+                )
                 print(log_msg)
             elif pbar is not None:
                 pbar.update(1)
