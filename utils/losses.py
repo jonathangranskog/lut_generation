@@ -57,3 +57,40 @@ def black_level_preservation_loss(
 def lut_smoothness_loss(lut: torch.Tensor) -> torch.Tensor:
     smoothed_lut = _downsample_upsample_3d(lut)
     return F.mse_loss(lut, smoothed_lut)
+
+
+def compute_losses(
+    loss_fn,
+    transformed_images: torch.Tensor,
+    original_images: torch.Tensor,
+    lut_tensor: torch.Tensor,
+    image_smoothness: float,
+    image_regularization: float,
+    black_preservation: float,
+    lut_smoothness: float,
+) -> tuple[torch.Tensor, dict]:
+    clip_loss = loss_fn(transformed_images)
+    loss = clip_loss
+    loss_components = {"clip": clip_loss}
+
+    if image_smoothness > 0:
+        img_smooth_loss = image_smoothness_loss(transformed_images)
+        loss = loss + image_smoothness * img_smooth_loss
+        loss_components["img_smooth"] = img_smooth_loss
+
+    if image_regularization > 0:
+        img_reg_loss = image_regularization_loss(transformed_images, original_images)
+        loss = loss + image_regularization * img_reg_loss
+        loss_components["img_reg"] = img_reg_loss
+
+    if black_preservation > 0:
+        black_loss = black_level_preservation_loss(transformed_images, original_images)
+        loss = loss + black_preservation * black_loss
+        loss_components["black"] = black_loss
+
+    if lut_smoothness > 0:
+        lut_smooth_loss = lut_smoothness_loss(lut_tensor)
+        loss = loss + lut_smoothness * lut_smooth_loss
+        loss_components["lut_smooth"] = lut_smooth_loss
+
+    return loss, loss_components

@@ -5,6 +5,7 @@ from .device import get_device
 from .io import load_image_as_tensor, read_cube_file, write_cube_file
 from .losses import (
     black_level_preservation_loss,
+    compute_losses,
     image_regularization_loss,
     image_smoothness_loss,
     lut_smoothness_loss,
@@ -21,9 +22,10 @@ __all__ = [
     "identity_lut",
     "postprocess_lut",
     # Loss functions
-    "image_smoothness_loss",
-    "image_regularization_loss",
     "black_level_preservation_loss",
+    "compute_losses",
+    "image_regularization_loss",
+    "image_smoothness_loss",
     "lut_smoothness_loss",
     # Dataset
     "ImageDataset",
