@@ -70,6 +70,23 @@ def sanitize_prompt_for_filename(prompt: str) -> str:
     return sanitized or "untitled"
 
 
+def load_image_as_tensor(image_path: str) -> torch.Tensor:
+    """
+    Load an image from disk and convert to a PyTorch tensor.
+
+    Args:
+        image_path: Path to the image file
+
+    Returns:
+        Image tensor of shape (C, H, W) with values in [0, 1]
+    """
+    image = Image.open(image_path).convert("RGB")
+    image_array = np.array(image)
+    image_tensor = torch.from_numpy(image_array).permute(2, 0, 1)
+    image_tensor = image_tensor.float() / 255.0
+    return image_tensor
+
+
 def save_training_checkpoint(
     step: int,
     lut_tensor: torch.Tensor,
@@ -153,12 +170,7 @@ def optimize(
         sample_image_cpu = dataset[sample_idx]  # (C, H, W)
         print(f"Selected sample image index {sample_idx} for logging")
     else:
-        # just open the test image
-        sample_image_cpu = Image.open(test_image)
-        sample_image_cpu = sample_image_cpu.convert("RGB")
-        sample_image_cpu = np.array(sample_image_cpu)
-        sample_image_cpu = torch.from_numpy(sample_image_cpu).permute(2, 0, 1)
-        sample_image_cpu = sample_image_cpu.float() / 255.0
+        sample_image_cpu = load_image_as_tensor(test_image)
         print(f"Loaded test image from {test_image}")
 
     # Create loss function
@@ -324,11 +336,8 @@ def infer(
     # read lut file
     lut_tensor, domain_min, domain_max = read_cube_file(lut)
 
-    # do the rest
-    image = Image.open(image)
-    image = image.convert("RGB")
-    image_tensor = torch.from_numpy(np.array(image)).permute(2, 0, 1)
-    image_tensor = image_tensor.float() / 255.0
+    # Load and prepare image
+    image_tensor = load_image_as_tensor(image)
     image_tensor = image_tensor.to(device).unsqueeze(0)
     image_tensor = apply_lut(image_tensor, lut_tensor, domain_min, domain_max)
     image_tensor = image_tensor.squeeze(0).permute(1, 2, 0).clamp(0, 1)
