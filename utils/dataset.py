@@ -3,6 +3,8 @@ from torchvision import transforms
 import os
 from PIL import Image
 
+from .constants import CLIP_IMAGE_SIZE
+
 
 class ImageDataset(Dataset):
     def __init__(self, image_folder: str):
@@ -15,8 +17,8 @@ class ImageDataset(Dataset):
         self.image_paths = sorted(self.image_paths)
         self.transform = transforms.Compose(
             [
-                transforms.Resize((224)),
-                transforms.CenterCrop((224)),
+                transforms.Resize((CLIP_IMAGE_SIZE)),
+                transforms.CenterCrop((CLIP_IMAGE_SIZE)),
                 transforms.ToTensor(),
             ]
         )

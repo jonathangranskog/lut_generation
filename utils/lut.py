@@ -4,6 +4,8 @@ from typing import Tuple
 import torch
 import torch.nn.functional as F
 
+from .constants import REC709_LUMA_R, REC709_LUMA_G, REC709_LUMA_B
+
 
 def read_cube_file(lut_path: str) -> Tuple[torch.Tensor, list, list]:
     """
@@ -177,22 +179,30 @@ def apply_lut(
             return result
 
 
-def postprocess_lut(lut: torch.Tensor) -> torch.Tensor:
+def _downsample_upsample_3d(lut: torch.Tensor, scale_factor: float = 0.5) -> torch.Tensor:
+    original_shape = lut.shape
+    # Reshape from (D, H, W, C) to (1, C, D, H, W) for interpolation
     lut_reshaped = lut.permute(3, 0, 1, 2).view(
-        1, 3, lut.shape[0], lut.shape[1], lut.shape[2]
+        1, 3, original_shape[0], original_shape[1], original_shape[2]
     )
-    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=0.5, mode="trilinear")
+    # Downsample then upsample for smoothing effect
+    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=scale_factor, mode="trilinear")
     lut_upsampled = F.interpolate(
         lut_downsampled,
-        size=(lut.shape[0], lut.shape[1], lut.shape[2]),
+        size=(original_shape[0], original_shape[1], original_shape[2]),
         mode="trilinear",
     )
+    # Reshape back to original format (D, H, W, C)
     lut_result = (
         lut_upsampled[0]
         .permute(1, 2, 3, 0)
-        .view(lut.shape[0], lut.shape[1], lut.shape[2], 3)
+        .view(original_shape[0], original_shape[1], original_shape[2], 3)
     )
     return lut_result
+
+
+def postprocess_lut(lut: torch.Tensor) -> torch.Tensor:
+    return _downsample_upsample_3d(lut)
 
 
 def write_cube_file(
@@ -283,17 +293,17 @@ def black_level_preservation_loss(
     threshold: float = 1e-2,
 ) -> torch.Tensor:
     # Compute luminance (approximate perceptual brightness)
-    # Using Rec. 709 luma coefficients: Y = 0.2126*R + 0.7152*G + 0.0722*B
+    # Using Rec. 709 luma coefficients
     orig_luma = (
-        0.2126 * original_images[:, 0, :, :]
-        + 0.7152 * original_images[:, 1, :, :]
-        + 0.0722 * original_images[:, 2, :, :]
+        REC709_LUMA_R * original_images[:, 0, :, :]
+        + REC709_LUMA_G * original_images[:, 1, :, :]
+        + REC709_LUMA_B * original_images[:, 2, :, :]
     )
 
     trans_luma = (
-        0.2126 * transformed_images[:, 0, :, :]
-        + 0.7152 * transformed_images[:, 1, :, :]
-        + 0.0722 * transformed_images[:, 2, :, :]
+        REC709_LUMA_R * transformed_images[:, 0, :, :]
+        + REC709_LUMA_G * transformed_images[:, 1, :, :]
+        + REC709_LUMA_B * transformed_images[:, 2, :, :]
     )
 
     # Create mask for dark pixels in original image
@@ -314,13 +324,5 @@ def black_level_preservation_loss(
 
 
 def lut_smoothness_loss(lut: torch.Tensor) -> torch.Tensor:
-    lut_reshaped = lut.permute(3, 0, 1, 2).view(
-        1, 3, lut.shape[0], lut.shape[1], lut.shape[2]
-    )
-    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=0.5, mode="trilinear")
-    lut_upsampled = F.interpolate(
-        lut_downsampled,
-        size=(lut.shape[0], lut.shape[1], lut.shape[2]),
-        mode="trilinear",
-    )
-    return F.mse_loss(lut_reshaped, lut_upsampled)
+    smoothed_lut = _downsample_upsample_3d(lut)
+    return F.mse_loss(lut, smoothed_lut)
