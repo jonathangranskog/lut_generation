@@ -127,6 +127,7 @@ def optimize(
     log_interval: int = 50,
     verbose: bool = False,
     output_path: str = "lut.cube",
+    test_image: str | None = None,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
@@ -149,10 +150,19 @@ def optimize(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     print(f"Loaded {len(dataset)} images from {image_folder}")
 
-    # Pick a random sample image for logging (keep on CPU initially)
-    sample_idx = random.randint(0, len(dataset) - 1)
-    sample_image_cpu = dataset[sample_idx]  # (C, H, W)
-    print(f"Selected sample image index {sample_idx} for logging")
+    if test_image is None:
+        # Pick a random sample image for logging (keep on CPU initially)
+        sample_idx = random.randint(0, len(dataset) - 1)
+        sample_image_cpu = dataset[sample_idx]  # (C, H, W)
+        print(f"Selected sample image index {sample_idx} for logging")
+    else:
+        # just open the test image
+        sample_image_cpu = Image.open(test_image)
+        sample_image_cpu = sample_image_cpu.convert("RGB")
+        sample_image_cpu = np.array(sample_image_cpu)
+        sample_image_cpu = torch.from_numpy(sample_image_cpu).permute(2, 0, 1)
+        sample_image_cpu = sample_image_cpu.float() / 255.0
+        print(f"Loaded test image from {test_image}")
 
     # Create loss function
     if model_type == "clip":
