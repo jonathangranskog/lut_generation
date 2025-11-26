@@ -1,7 +1,8 @@
 """Test smoothness loss computation."""
 
 import torch
-from utils.lut import identity_lut, lut_smoothness_loss
+from utils.transforms import identity_lut
+from utils.losses import lut_smoothness_loss
 
 # Test 1: Identity LUT should have low smoothness loss (smooth transitions)
 print("Test 1: Identity LUT smoothness")
