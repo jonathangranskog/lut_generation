@@ -2,7 +2,7 @@
 
 from .dataset import ImageDataset
 from .device import get_device
-from .io import read_cube_file, write_cube_file
+from .io import load_image_as_tensor, read_cube_file, write_cube_file
 from .losses import (
     black_level_preservation_loss,
     image_regularization_loss,
@@ -13,6 +13,7 @@ from .transforms import apply_lut, identity_lut, postprocess_lut
 
 __all__ = [
     # LUT I/O
+    "load_image_as_tensor",
     "read_cube_file",
     "write_cube_file",
     # LUT operations

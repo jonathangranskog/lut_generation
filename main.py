@@ -32,6 +32,7 @@ from utils import (
     identity_lut,
     image_regularization_loss,
     image_smoothness_loss,
+    load_image_as_tensor,
     lut_smoothness_loss,
     postprocess_lut,
     read_cube_file,
@@ -69,14 +70,6 @@ def sanitize_prompt_for_filename(prompt: str) -> str:
     sanitized = sanitized.strip("_.")
 
     return sanitized or "untitled"
-
-
-def load_image_as_tensor(image_path: str) -> torch.Tensor:
-    image = Image.open(image_path).convert("RGB")
-    image_array = np.array(image)
-    image_tensor = torch.from_numpy(image_array).permute(2, 0, 1)
-    image_tensor = image_tensor.float() / 255.0
-    return image_tensor
 
 
 def compute_losses(

@@ -1,7 +1,17 @@
 import re
 from typing import Tuple
 
+import numpy as np
 import torch
+from PIL import Image
+
+
+def load_image_as_tensor(image_path: str) -> torch.Tensor:
+    image = Image.open(image_path).convert("RGB")
+    image_array = np.array(image)
+    image_tensor = torch.from_numpy(image_array).permute(2, 0, 1)
+    image_tensor = image_tensor.float() / 255.0
+    return image_tensor
 
 
 def read_cube_file(lut_path: str) -> Tuple[torch.Tensor, list, list]:
