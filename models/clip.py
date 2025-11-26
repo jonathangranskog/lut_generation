@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from transformers import CLIPModel, CLIPTokenizer
 
-from constants import CLIP_IMAGE_SIZE, CLIP_MEAN, CLIP_STD
+from utils.constants import CLIP_IMAGE_SIZE, CLIP_MEAN, CLIP_STD
 
 
 class CLIPLoss(nn.Module):

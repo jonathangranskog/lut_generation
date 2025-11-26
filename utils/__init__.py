@@ -1,7 +1,7 @@
 """Utility functions and classes for LUT generation and manipulation."""
 
-from utils.dataset import ImageDataset
-from utils.lut import (
+from .dataset import ImageDataset
+from .lut import (
     apply_lut,
     black_level_preservation_loss,
     identity_lut,

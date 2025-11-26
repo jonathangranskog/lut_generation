@@ -3,7 +3,7 @@ from torchvision import transforms
 import os
 from PIL import Image
 
-from constants import CLIP_IMAGE_SIZE
+from .constants import CLIP_IMAGE_SIZE
 
 
 class ImageDataset(Dataset):
