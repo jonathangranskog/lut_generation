@@ -19,17 +19,15 @@ from PIL import Image
 from typing import Literal
 from typing_extensions import Annotated
 from pathlib import Path
-from utils.lut import (
-    read_cube_file,
-    apply_lut,
-    identity_lut,
-    write_cube_file,
+from utils.io import read_cube_file, write_cube_file
+from utils.transforms import apply_lut, identity_lut, postprocess_lut
+from utils.losses import (
     image_smoothness_loss,
     image_regularization_loss,
     black_level_preservation_loss,
     lut_smoothness_loss,
-    postprocess_lut,
 )
+from utils.device import get_device
 from models.clip import CLIPLoss
 from utils.dataset import ImageDataset
 from torch.utils.data import DataLoader
@@ -137,12 +135,8 @@ def optimize(
     Black preservation prevents faded/lifted blacks (maintains deep shadows).
     Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
     """
-    # Select device
-    # Note: MPS doesn't support grid_sampler_3d_backward, so use CUDA or CPU
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
+    # Select device (MPS doesn't support grid_sampler_3d_backward)
+    device = get_device(allow_mps=False)
     print(f"Using device: {device}")
 
     # Create dataset
@@ -321,13 +315,8 @@ def infer(
     if not os.path.exists(image):
         raise FileNotFoundError(f"Image file not found: {image}")
 
-    # select device
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
+    # Select device (MPS is fine for inference)
+    device = get_device(allow_mps=True)
 
     # read lut file
     lut_tensor, domain_min, domain_max = read_cube_file(lut)
