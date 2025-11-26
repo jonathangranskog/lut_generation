@@ -72,15 +72,6 @@ def sanitize_prompt_for_filename(prompt: str) -> str:
 
 
 def load_image_as_tensor(image_path: str) -> torch.Tensor:
-    """
-    Load an image from disk and convert to a PyTorch tensor.
-
-    Args:
-        image_path: Path to the image file
-
-    Returns:
-        Image tensor of shape (C, H, W) with values in [0, 1]
-    """
     image = Image.open(image_path).convert("RGB")
     image_array = np.array(image)
     image_tensor = torch.from_numpy(image_array).permute(2, 0, 1)
@@ -98,12 +89,6 @@ def compute_losses(
     black_preservation: float,
     lut_smoothness: float,
 ) -> tuple[torch.Tensor, dict]:
-    """
-    Compute all losses for LUT optimization.
-
-    Returns:
-        Tuple of (total_loss, loss_components_dict)
-    """
     clip_loss = loss_fn(transformed_images)
     loss = clip_loss
     loss_components = {"clip": clip_loss}
