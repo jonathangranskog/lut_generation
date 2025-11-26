@@ -2,6 +2,7 @@ import re
 from typing import Tuple
 
 import torch
+import torch.nn.functional as F
 
 
 def read_cube_file(lut_path: str) -> Tuple[torch.Tensor, list, list]:
@@ -152,7 +153,7 @@ def apply_lut(
     coords = coords.view(B, H * W, 1, 1, 3)
 
     # Sample the LUT with trilinear interpolation
-    lut_sampled = torch.nn.functional.grid_sample(
+    lut_sampled = F.grid_sample(
         lut, coords, mode="bilinear", padding_mode="border", align_corners=False
     )
 
@@ -174,6 +175,24 @@ def apply_lut(
             return result.permute(0, 3, 1, 2)
         else:
             return result
+
+
+def postprocess_lut(lut: torch.Tensor) -> torch.Tensor:
+    lut_reshaped = lut.permute(3, 0, 1, 2).view(
+        1, 3, lut.shape[0], lut.shape[1], lut.shape[2]
+    )
+    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=0.5, mode="trilinear")
+    lut_upsampled = F.interpolate(
+        lut_downsampled,
+        size=(lut.shape[0], lut.shape[1], lut.shape[2]),
+        mode="trilinear",
+    )
+    lut_result = (
+        lut_upsampled[0]
+        .permute(1, 2, 3, 0)
+        .view(lut.shape[0], lut.shape[1], lut.shape[2], 3)
+    )
+    return lut_result
 
 
 def write_cube_file(
@@ -246,67 +265,23 @@ def identity_lut(resolution: int = 32) -> torch.Tensor:
 
 
 def image_smoothness_loss(images: torch.Tensor) -> torch.Tensor:
-    """
-    Compute total variation (smoothness) loss on images.
-
-    Penalizes abrupt changes between adjacent pixels, preventing banding
-    and other discontinuities in the output images.
-
-    Args:
-        images: Batch of images, shape (B, C, H, W)
-
-    Returns:
-        Scalar smoothness loss (mean squared differences across spatial dims)
-    """
-    # Compute differences along height (vertical)
-    diff_h = images[:, :, 1:, :] - images[:, :, :-1, :]
-
-    # Compute differences along width (horizontal)
-    diff_w = images[:, :, :, 1:] - images[:, :, :, :-1]
-
-    # Total variation loss (L2)
-    loss = (diff_h**2).mean() + (diff_w**2).mean()
-
-    return loss
+    B, C, H, W = images.shape
+    downsampled_images = F.interpolate(images, scale_factor=0.5, mode="bilinear")
+    upsampled_images = F.interpolate(downsampled_images, size=(H, W), mode="bilinear")
+    return F.mse_loss(images, upsampled_images)
 
 
 def image_regularization_loss(
     transformed_images: torch.Tensor, original_images: torch.Tensor
 ) -> torch.Tensor:
-    """
-    Penalize deviation from original images.
-    
-    Encourages the LUT to make subtle adjustments rather than
-    extreme transformations.
-    
-    Args:
-        transformed_images: LUT-transformed images, shape (B, C, H, W)
-        original_images: Original input images, shape (B, C, H, W)
-    
-    Returns:
-        Scalar loss (MSE between original and transformed images)
-    """
-    return torch.nn.functional.mse_loss(transformed_images, original_images)
+    return F.mse_loss(transformed_images, original_images)
 
 
 def black_level_preservation_loss(
-    transformed_images: torch.Tensor, original_images: torch.Tensor, threshold: float = 0.1
+    transformed_images: torch.Tensor,
+    original_images: torch.Tensor,
+    threshold: float = 1e-2,
 ) -> torch.Tensor:
-    """
-    Preserve black levels - penalize lifting of dark pixels.
-    
-    Prevents the common issue of faded/lifted blacks by penalizing when
-    dark pixels in the input become brighter in the output.
-    
-    Args:
-        transformed_images: LUT-transformed images, shape (B, C, H, W)
-        original_images: Original input images, shape (B, C, H, W)
-        threshold: Brightness threshold below which pixels are considered "dark"
-                   (default: 0.1, range [0, 1])
-    
-    Returns:
-        Scalar loss penalizing lifted blacks
-    """
     # Compute luminance (approximate perceptual brightness)
     # Using Rec. 709 luma coefficients: Y = 0.2126*R + 0.7152*G + 0.0722*B
     orig_luma = (
@@ -314,26 +289,38 @@ def black_level_preservation_loss(
         + 0.7152 * original_images[:, 1, :, :]
         + 0.0722 * original_images[:, 2, :, :]
     )
-    
+
     trans_luma = (
         0.2126 * transformed_images[:, 0, :, :]
         + 0.7152 * transformed_images[:, 1, :, :]
         + 0.0722 * transformed_images[:, 2, :, :]
     )
-    
+
     # Create mask for dark pixels in original image
     dark_mask = (orig_luma < threshold).float()
-    
+
     # Compute how much dark pixels have been lifted
     # Only penalize when transformed > original (lifting blacks)
     lift = torch.relu(trans_luma - orig_luma)
-    
+
     # Apply mask and compute loss only on dark regions
     masked_lift = lift * dark_mask
-    
+
     # Return mean lift in dark regions
     # Add small epsilon to avoid division by zero if no dark pixels
     num_dark_pixels = dark_mask.sum() + 1e-6
     loss = masked_lift.sum() / num_dark_pixels
-    
     return loss
+
+
+def lut_smoothness_loss(lut: torch.Tensor) -> torch.Tensor:
+    lut_reshaped = lut.permute(3, 0, 1, 2).view(
+        1, 3, lut.shape[0], lut.shape[1], lut.shape[2]
+    )
+    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=0.5, mode="trilinear")
+    lut_upsampled = F.interpolate(
+        lut_downsampled,
+        size=(lut.shape[0], lut.shape[1], lut.shape[2]),
+        mode="trilinear",
+    )
+    return F.mse_loss(lut_reshaped, lut_upsampled)
