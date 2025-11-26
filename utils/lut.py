@@ -4,6 +4,8 @@ from typing import Tuple
 import torch
 import torch.nn.functional as F
 
+from constants import REC709_LUMA_R, REC709_LUMA_G, REC709_LUMA_B
+
 
 def read_cube_file(lut_path: str) -> Tuple[torch.Tensor, list, list]:
     """
@@ -177,22 +179,56 @@ def apply_lut(
             return result
 
 
-def postprocess_lut(lut: torch.Tensor) -> torch.Tensor:
+def _downsample_upsample_3d(lut: torch.Tensor, scale_factor: float = 0.5) -> torch.Tensor:
+    """
+    Apply downsample-upsample smoothing to a 3D LUT tensor.
+
+    This is a common smoothing operation that downsamples the LUT, then upsamples
+    it back to the original size using trilinear interpolation. This helps reduce
+    high-frequency noise while preserving overall color transformation.
+
+    Args:
+        lut: LUT tensor of shape (size, size, size, 3)
+        scale_factor: Downsampling scale factor (default: 0.5)
+
+    Returns:
+        Smoothed LUT tensor of the same shape as input
+    """
+    original_shape = lut.shape
+    # Reshape from (D, H, W, C) to (1, C, D, H, W) for interpolation
     lut_reshaped = lut.permute(3, 0, 1, 2).view(
-        1, 3, lut.shape[0], lut.shape[1], lut.shape[2]
+        1, 3, original_shape[0], original_shape[1], original_shape[2]
     )
-    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=0.5, mode="trilinear")
+    # Downsample then upsample for smoothing effect
+    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=scale_factor, mode="trilinear")
     lut_upsampled = F.interpolate(
         lut_downsampled,
-        size=(lut.shape[0], lut.shape[1], lut.shape[2]),
+        size=(original_shape[0], original_shape[1], original_shape[2]),
         mode="trilinear",
     )
+    # Reshape back to original format (D, H, W, C)
     lut_result = (
         lut_upsampled[0]
         .permute(1, 2, 3, 0)
-        .view(lut.shape[0], lut.shape[1], lut.shape[2], 3)
+        .view(original_shape[0], original_shape[1], original_shape[2], 3)
     )
     return lut_result
+
+
+def postprocess_lut(lut: torch.Tensor) -> torch.Tensor:
+    """
+    Apply smoothing post-processing to a LUT.
+
+    This reduces high-frequency artifacts while preserving the overall
+    color transformation characteristics.
+
+    Args:
+        lut: LUT tensor of shape (size, size, size, 3)
+
+    Returns:
+        Smoothed LUT tensor of the same shape
+    """
+    return _downsample_upsample_3d(lut)
 
 
 def write_cube_file(
@@ -265,6 +301,19 @@ def identity_lut(resolution: int = 32) -> torch.Tensor:
 
 
 def image_smoothness_loss(images: torch.Tensor) -> torch.Tensor:
+    """
+    Compute smoothness loss for a batch of images.
+
+    Measures how much an image differs from its smoothed version (obtained via
+    downsample-upsample). Encourages smoother transformations by penalizing
+    high-frequency changes.
+
+    Args:
+        images: Batch of images of shape (B, C, H, W)
+
+    Returns:
+        Scalar loss value (MSE between original and smoothed images)
+    """
     B, C, H, W = images.shape
     downsampled_images = F.interpolate(images, scale_factor=0.5, mode="bilinear")
     upsampled_images = F.interpolate(downsampled_images, size=(H, W), mode="bilinear")
@@ -274,6 +323,19 @@ def image_smoothness_loss(images: torch.Tensor) -> torch.Tensor:
 def image_regularization_loss(
     transformed_images: torch.Tensor, original_images: torch.Tensor
 ) -> torch.Tensor:
+    """
+    Compute regularization loss to keep transformations close to the original.
+
+    This loss encourages the LUT transformation to stay close to the identity
+    transformation, preventing overly aggressive color changes.
+
+    Args:
+        transformed_images: Batch of LUT-transformed images of shape (B, C, H, W)
+        original_images: Batch of original images of shape (B, C, H, W)
+
+    Returns:
+        Scalar loss value (MSE between transformed and original images)
+    """
     return F.mse_loss(transformed_images, original_images)
 
 
@@ -282,18 +344,33 @@ def black_level_preservation_loss(
     original_images: torch.Tensor,
     threshold: float = 1e-2,
 ) -> torch.Tensor:
+    """
+    Compute loss to prevent lifting of dark pixels (crushing blacks).
+
+    This loss penalizes transformations that brighten originally dark pixels,
+    which is often an undesirable artifact in color grading. It identifies
+    dark pixels based on luminance and measures how much they've been lifted.
+
+    Args:
+        transformed_images: Batch of LUT-transformed images of shape (B, C, H, W)
+        original_images: Batch of original images of shape (B, C, H, W)
+        threshold: Luminance threshold below which pixels are considered "dark" (default: 0.01)
+
+    Returns:
+        Scalar loss value (mean lift amount in dark regions)
+    """
     # Compute luminance (approximate perceptual brightness)
-    # Using Rec. 709 luma coefficients: Y = 0.2126*R + 0.7152*G + 0.0722*B
+    # Using Rec. 709 luma coefficients
     orig_luma = (
-        0.2126 * original_images[:, 0, :, :]
-        + 0.7152 * original_images[:, 1, :, :]
-        + 0.0722 * original_images[:, 2, :, :]
+        REC709_LUMA_R * original_images[:, 0, :, :]
+        + REC709_LUMA_G * original_images[:, 1, :, :]
+        + REC709_LUMA_B * original_images[:, 2, :, :]
     )
 
     trans_luma = (
-        0.2126 * transformed_images[:, 0, :, :]
-        + 0.7152 * transformed_images[:, 1, :, :]
-        + 0.0722 * transformed_images[:, 2, :, :]
+        REC709_LUMA_R * transformed_images[:, 0, :, :]
+        + REC709_LUMA_G * transformed_images[:, 1, :, :]
+        + REC709_LUMA_B * transformed_images[:, 2, :, :]
     )
 
     # Create mask for dark pixels in original image
@@ -314,13 +391,18 @@ def black_level_preservation_loss(
 
 
 def lut_smoothness_loss(lut: torch.Tensor) -> torch.Tensor:
-    lut_reshaped = lut.permute(3, 0, 1, 2).view(
-        1, 3, lut.shape[0], lut.shape[1], lut.shape[2]
-    )
-    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=0.5, mode="trilinear")
-    lut_upsampled = F.interpolate(
-        lut_downsampled,
-        size=(lut.shape[0], lut.shape[1], lut.shape[2]),
-        mode="trilinear",
-    )
-    return F.mse_loss(lut_reshaped, lut_upsampled)
+    """
+    Compute smoothness loss for a LUT.
+
+    Measures how much a LUT differs from its smoothed version (obtained via
+    downsample-upsample). Encourages smoother color transformations by penalizing
+    high-frequency changes in the LUT space.
+
+    Args:
+        lut: LUT tensor of shape (size, size, size, 3)
+
+    Returns:
+        Scalar loss value (MSE between original and smoothed LUT)
+    """
+    smoothed_lut = _downsample_upsample_3d(lut)
+    return F.mse_loss(lut, smoothed_lut)

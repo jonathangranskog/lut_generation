@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 from transformers import CLIPModel, CLIPTokenizer
 
+from constants import CLIP_IMAGE_SIZE, CLIP_MEAN, CLIP_STD
+
 
 class CLIPLoss(nn.Module):
     """
@@ -76,18 +78,18 @@ class CLIPLoss(nn.Module):
         """
         # CLIP's normalization values (from OpenAI's CLIP preprocessing)
         # https://github.com/openai/CLIP/blob/main/clip/clip.py
-        mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).to(images.device)
-        std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).to(images.device)
+        mean = torch.tensor(CLIP_MEAN).to(images.device)
+        std = torch.tensor(CLIP_STD).to(images.device)
 
         # Reshape for broadcasting: (1, 3, 1, 1)
         mean = mean.view(1, 3, 1, 1)
         std = std.view(1, 3, 1, 1)
 
-        # Resize to 224x224 if needed (CLIP's expected input size)
-        if images.shape[-2:] != (224, 224):
+        # Resize to CLIP's expected input size if needed
+        if images.shape[-2:] != (CLIP_IMAGE_SIZE, CLIP_IMAGE_SIZE):
             images = torch.nn.functional.interpolate(
                 images,
-                size=(224, 224),
+                size=(CLIP_IMAGE_SIZE, CLIP_IMAGE_SIZE),
                 mode="bicubic",
                 align_corners=False,
                 antialias=True,
