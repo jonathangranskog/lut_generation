@@ -6,11 +6,6 @@ import os
 import tempfile
 import torch
 
-# Add parent directory to path to import lut module
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from utils.io import read_cube_file, write_cube_file
 from utils.transforms import apply_lut, identity_lut
 
