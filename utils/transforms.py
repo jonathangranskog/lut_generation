@@ -110,14 +110,18 @@ def identity_lut(resolution: int = 32) -> torch.Tensor:
     return identity_lut
 
 
-def _downsample_upsample_3d(lut: torch.Tensor, scale_factor: float = 0.5) -> torch.Tensor:
+def _downsample_upsample_3d(
+    lut: torch.Tensor, scale_factor: float = 0.5
+) -> torch.Tensor:
     original_shape = lut.shape
     # Reshape from (D, H, W, C) to (1, C, D, H, W) for interpolation
     lut_reshaped = lut.permute(3, 0, 1, 2).view(
         1, 3, original_shape[0], original_shape[1], original_shape[2]
     )
     # Downsample then upsample for smoothing effect
-    lut_downsampled = F.interpolate(lut_reshaped, scale_factor=scale_factor, mode="trilinear")
+    lut_downsampled = F.interpolate(
+        lut_reshaped, scale_factor=scale_factor, mode="trilinear"
+    )
     lut_upsampled = F.interpolate(
         lut_downsampled,
         size=(original_shape[0], original_shape[1], original_shape[2]),
