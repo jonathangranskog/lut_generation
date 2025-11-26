@@ -8,34 +8,35 @@ It can use either CLIP, Score Distillation Sampling or VLMs to optimize the LUT.
 Using the `infer` command, this script will apply a LUT to an image.
 """
 
-import torch
-import typer
 import os
-import numpy as np
 import random
 import re
-
-from PIL import Image
-from typing import Literal
-from typing_extensions import Annotated
 from pathlib import Path
+from typing import Literal
+
+import numpy as np
+import torch
+import typer
+from PIL import Image
+from torch.optim import Adam
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from typing_extensions import Annotated
+
+from models.clip import CLIPLoss
 from utils import (
+    ImageDataset,
+    apply_lut,
+    black_level_preservation_loss,
+    get_device,
+    identity_lut,
+    image_regularization_loss,
+    image_smoothness_loss,
+    lut_smoothness_loss,
+    postprocess_lut,
     read_cube_file,
     write_cube_file,
-    apply_lut,
-    identity_lut,
-    postprocess_lut,
-    image_smoothness_loss,
-    image_regularization_loss,
-    black_level_preservation_loss,
-    lut_smoothness_loss,
-    get_device,
-    ImageDataset,
 )
-from models.clip import CLIPLoss
-from torch.utils.data import DataLoader
-from torch.optim import Adam
-from tqdm import tqdm
 
 ModelType = Literal["clip"]
 
