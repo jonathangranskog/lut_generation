@@ -161,7 +161,7 @@ def optimize(
     log_interval: int = 50,
     verbose: bool = False,
     output_path: str = "lut.cube",
-    test_images: list[str] | None = None,
+    test_image: list[str] | None = None,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
@@ -180,15 +180,15 @@ def optimize(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     print(f"Loaded {len(dataset)} images from {image_folder}")
 
-    if test_images is None or len(test_images) == 0:
+    if test_image is None or len(test_image) == 0:
         # Pick a random sample image for logging (keep on CPU initially)
         sample_idx = random.randint(0, len(dataset) - 1)
         sample_images_cpu = [dataset[sample_idx]]  # List of (C, H, W) tensors
         print(f"Selected sample image index {sample_idx} for logging")
     else:
-        sample_images_cpu = [load_image_as_tensor(img_path) for img_path in test_images]
-        print(f"Loaded {len(test_images)} test images:")
-        for img_path in test_images:
+        sample_images_cpu = [load_image_as_tensor(img_path) for img_path in test_image]
+        print(f"Loaded {len(test_image)} test images:")
+        for img_path in test_image:
             print(f"  - {img_path}")
 
     # Create loss function
