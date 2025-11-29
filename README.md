@@ -16,7 +16,7 @@ Note: a lot of vibe-coding was used to write this code.
 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) package manager
-- A small dataset of 25-100 images
+- A small dataset of 25-100 images, alternatively you can download [some images from me](https://drive.google.com/file/d/1bN03SkGs6E_K1C9Dc9r1Hl0BK48LqMQ2/view?usp=drive_link)
 
 ### Setup
 
