@@ -2,6 +2,7 @@
 
 from .dataset import ImageDataset
 from .device import get_device
+from .image import pil_to_tensor, save_tensor_as_image, tensor_to_pil
 from .io import load_image_as_tensor, read_cube_file, write_cube_file
 from .losses import (
     black_level_preservation_loss,
@@ -17,6 +18,10 @@ __all__ = [
     "load_image_as_tensor",
     "read_cube_file",
     "write_cube_file",
+    # Image conversion
+    "tensor_to_pil",
+    "pil_to_tensor",
+    "save_tensor_as_image",
     # LUT operations
     "apply_lut",
     "identity_lut",

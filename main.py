@@ -14,10 +14,8 @@ import re
 from pathlib import Path
 from typing import Literal
 
-import numpy as np
 import torch
 import typer
-from PIL import Image
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -33,6 +31,8 @@ from utils import (
     load_image_as_tensor,
     postprocess_lut,
     read_cube_file,
+    save_tensor_as_image,
+    tensor_to_pil,
     write_cube_file,
 )
 
@@ -137,14 +137,12 @@ def save_training_checkpoint(
             # Apply LUT
             transformed = apply_lut(sample_image, lut_tensor)
 
-            # Convert to numpy and save
+            # Concatenate original and transformed images side-by-side
             concatenated = torch.cat([sample_image, transformed], dim=-1)
-            img_array = concatenated.permute(1, 2, 0).clamp(0, 1).cpu().numpy()
-            img_array = (img_array * 255).astype(np.uint8)
-            img = Image.fromarray(img_array)
 
+            # Save using helper function
             img_path = output_dir / f"image_{idx}_step_{step:05d}.png"
-            img.save(img_path)
+            save_tensor_as_image(concatenated, str(img_path))
 
 
 @app.command()
@@ -220,10 +218,8 @@ def optimize(
         # Save the original (untransformed) sample images
         log_dir.mkdir(parents=True, exist_ok=True)
         for idx, sample_image_cpu in enumerate(sample_images_cpu):
-            original_img = sample_image_cpu.permute(1, 2, 0).clamp(0, 1).numpy()
-            original_img = (original_img * 255).astype(np.uint8)
             img_path = log_dir / f"image_{idx}_original.png"
-            Image.fromarray(original_img).save(img_path)
+            save_tensor_as_image(sample_image_cpu, str(img_path))
             print(f"Saved original sample image {idx} to {img_path}")
         print()
 
@@ -342,10 +338,10 @@ def infer(
     image_tensor = load_image_as_tensor(image)
     image_tensor = image_tensor.to(device).unsqueeze(0)
     image_tensor = apply_lut(image_tensor, lut_tensor, domain_min, domain_max)
-    image_tensor = image_tensor.squeeze(0).permute(1, 2, 0).clamp(0, 1)
-    image_tensor = (image_tensor * 255.0).round().to(torch.uint8).cpu().numpy()
-    image = Image.fromarray(image_tensor)
-    image.save(output_path)
+    image_tensor = image_tensor.squeeze(0)
+
+    # Save the transformed image
+    save_tensor_as_image(image_tensor, output_path)
 
 
 if __name__ == "__main__":
