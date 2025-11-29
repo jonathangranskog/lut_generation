@@ -137,7 +137,7 @@ Step 100: Loss = 0.7935 (CLIP: 0.7905, Smooth: 0.0004, Reg: 0.0017, Black: 0.000
 
 ### Accuracy
 
-Large transformations, like black-and-white filters, are harder to learn. Sometimes also prompts might led to incorrect results based on the model's understanding of language (e.g. "not red" might lead to "red" LUTs).
+Large transformations, like black-and-white filters, are harder to learn. Some prompts might lead to incorrect results based on the model's understanding of language (e.g. "not red" might lead to "red" LUTs).
 
 ### Artifacts
 
