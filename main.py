@@ -14,10 +14,8 @@ import re
 from pathlib import Path
 from typing import Literal
 
-import numpy as np
 import torch
 import typer
-from PIL import Image
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -33,6 +31,8 @@ from utils import (
     load_image_as_tensor,
     postprocess_lut,
     read_cube_file,
+    save_tensor_as_image,
+    tensor_to_pil,
     write_cube_file,
 )
 
@@ -106,16 +106,16 @@ def format_loss_log(
 def save_training_checkpoint(
     step: int,
     lut_tensor: torch.Tensor,
-    sample_image: torch.Tensor,
+    sample_images: list[torch.Tensor],
     output_dir: Path,
 ) -> None:
     """
-    Save LUT and a sample transformed image for training monitoring.
+    Save LUT and sample transformed images for training monitoring.
 
     Args:
         step: Current training step
         lut_tensor: Current LUT state
-        sample_image: Sample image tensor (C, H, W) in [0, 1] range
+        sample_images: List of sample image tensors, each (C, H, W) in [0, 1] range
         output_dir: Directory to save checkpoints
     """
     # Create checkpoint directory
@@ -131,19 +131,18 @@ def save_training_checkpoint(
         title=f"Training Step {step}",
     )
 
-    # Apply LUT to sample image and save
+    # Apply LUT to each sample image and save
     with torch.no_grad():
-        # Apply LUT
-        transformed = apply_lut(sample_image, lut_tensor)
+        for idx, sample_image in enumerate(sample_images):
+            # Apply LUT
+            transformed = apply_lut(sample_image, lut_tensor)
 
-        # Convert to numpy and save
-        concatenated = torch.cat([sample_image, transformed], dim=-1)
-        img_array = concatenated.permute(1, 2, 0).clamp(0, 1).cpu().numpy()
-        img_array = (img_array * 255).astype(np.uint8)
-        img = Image.fromarray(img_array)
+            # Concatenate original and transformed images side-by-side
+            concatenated = torch.cat([sample_image, transformed], dim=-1)
 
-        img_path = output_dir / f"image_step_{step:05d}.png"
-        img.save(img_path)
+            # Save using helper function
+            img_path = output_dir / f"image_{idx}_step_{step:05d}.png"
+            save_tensor_as_image(concatenated, str(img_path))
 
 
 @app.command()
@@ -162,7 +161,7 @@ def optimize(
     log_interval: int = 50,
     verbose: bool = False,
     output_path: str = "lut.cube",
-    test_image: str | None = None,
+    test_image: list[str] | None = None,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
@@ -181,14 +180,16 @@ def optimize(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     print(f"Loaded {len(dataset)} images from {image_folder}")
 
-    if test_image is None:
+    if test_image is None or len(test_image) == 0:
         # Pick a random sample image for logging (keep on CPU initially)
         sample_idx = random.randint(0, len(dataset) - 1)
-        sample_image_cpu = dataset[sample_idx]  # (C, H, W)
+        sample_images_cpu = [dataset[sample_idx]]  # List of (C, H, W) tensors
         print(f"Selected sample image index {sample_idx} for logging")
     else:
-        sample_image_cpu = load_image_as_tensor(test_image)
-        print(f"Loaded test image from {test_image}")
+        sample_images_cpu = [load_image_as_tensor(img_path) for img_path in test_image]
+        print(f"Loaded {len(test_image)} test images:")
+        for img_path in test_image:
+            print(f"  - {img_path}")
 
     # Create loss function
     if model_type == "clip":
@@ -214,12 +215,13 @@ def optimize(
     if log_interval > 0:
         print(f"Training logs will be saved to: {log_dir}/\n")
 
-        # Save the original (untransformed) sample image
+        # Save the original (untransformed) sample images
         log_dir.mkdir(parents=True, exist_ok=True)
-        original_img = sample_image_cpu.permute(1, 2, 0).clamp(0, 1).numpy()
-        original_img = (original_img * 255).astype(np.uint8)
-        Image.fromarray(original_img).save(log_dir / "image_original.png")
-        print(f"Saved original sample image to {log_dir}/image_original.png\n")
+        for idx, sample_image_cpu in enumerate(sample_images_cpu):
+            img_path = log_dir / f"image_{idx}_original.png"
+            save_tensor_as_image(sample_image_cpu, str(img_path))
+            print(f"Saved original sample image {idx} to {img_path}")
+        print()
 
     while not stop:
         for images in dataloader:
@@ -257,9 +259,9 @@ def optimize(
 
             # Save checkpoint every log_interval steps
             if log_interval > 0 and step % log_interval == 0:
-                sample_image_device = sample_image_cpu.to(device)
+                sample_images_device = [img.to(device) for img in sample_images_cpu]
                 save_training_checkpoint(
-                    step, postprocess_lut(lut_tensor), sample_image_device, log_dir
+                    step, postprocess_lut(lut_tensor), sample_images_device, log_dir
                 )
                 if verbose:
                     print(f"  → Saved checkpoint to {log_dir}/")
@@ -289,9 +291,9 @@ def optimize(
 
     # Save final checkpoint
     if log_interval > 0:
-        sample_image_device = sample_image_cpu.to(device)
+        sample_images_device = [img.to(device) for img in sample_images_cpu]
         save_training_checkpoint(
-            step, postprocess_lut(lut_tensor), sample_image_device, log_dir
+            step, postprocess_lut(lut_tensor), sample_images_device, log_dir
         )
         print(f"Saved final checkpoint to {log_dir}/")
 
@@ -336,10 +338,10 @@ def infer(
     image_tensor = load_image_as_tensor(image)
     image_tensor = image_tensor.to(device).unsqueeze(0)
     image_tensor = apply_lut(image_tensor, lut_tensor, domain_min, domain_max)
-    image_tensor = image_tensor.squeeze(0).permute(1, 2, 0).clamp(0, 1)
-    image_tensor = (image_tensor * 255.0).round().to(torch.uint8).cpu().numpy()
-    image = Image.fromarray(image_tensor)
-    image.save(output_path)
+    image_tensor = image_tensor.squeeze(0)
+
+    # Save the transformed image
+    save_tensor_as_image(image_tensor, output_path)
 
 
 if __name__ == "__main__":
