@@ -5,4 +5,5 @@
 __pycache__/
 images/
 images_resized/
+tmp/
 .DS_Store

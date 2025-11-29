@@ -133,6 +133,22 @@ Watch the verbose output to see how each contributes:
 Step 100: Loss = 0.7935 (CLIP: 0.7905, Smooth: 0.0004, Reg: 0.0017, Black: 0.0000, LUT Smooth: 0.0008)
 ```
 
+# Limitations
+
+### Accuracy
+
+Large transformations, like black-and-white filters, are harder to learn. Sometimes also prompts might led to incorrect results based on the model's understanding of language (e.g. "not red" might lead to "red" LUTs).
+
+### Artifacts
+
+Higher resolution or long training of LUTs might lead to banding artifacts. To combat, increase weights of regularization losses, lower learning rate or reduce LUT resolution.
+
+# Future Improvements
+
+* Support VLM-based optimization (similar to our paper [Dual-Process Image Generation](https://dual-process.github.io/)) or SDS optimization (like in [DreamFusion](https://dreamfusion3d.github.io/))
+* Other representations besides LUTs
+* Large-scale LUT library generation
+
 ## License
 
 MIT.
