@@ -78,7 +78,7 @@ python main.py optimize [OPTIONS]
 - `--batch-size INT`: Batch size (default: 4)
 - `--log-interval INT`: Save progress every N steps (default: 50, 0 to disable)
 - `--output-path PATH`: Output .cube file (default: "lut.cube")
-- `--test-image PATH`: Image to apply LUT to during logging (default picks a random training image)
+- `--test-images PATH`: Images to apply LUT to during logging (can specify multiple times, default picks a random training image)
 - `--verbose`: Show detailed loss breakdown every 10 steps
 
 **Example:**
