@@ -69,9 +69,9 @@ def compute_losses(
     black_preservation: float,
     lut_smoothness: float,
 ) -> tuple[torch.Tensor, dict]:
-    clip_loss = loss_fn(transformed_images)
-    loss = clip_loss
-    loss_components = {"clip": clip_loss}
+    primary_loss = loss_fn(transformed_images)
+    loss = primary_loss
+    loss_components = {"primary": primary_loss}
 
     if image_smoothness > 0:
         img_smooth_loss = image_smoothness_loss(transformed_images)
