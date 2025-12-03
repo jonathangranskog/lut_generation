@@ -22,7 +22,10 @@ from tqdm import tqdm
 from typing_extensions import Annotated
 
 from models.clip import CLIPLoss
+from models.vlm import VLMLoss
 from utils import (
+    CLIP_IMAGE_SIZE,
+    VLM_IMAGE_SIZE,
     ImageDataset,
     apply_lut,
     compute_losses,
@@ -36,7 +39,7 @@ from utils import (
     write_cube_file,
 )
 
-ModelType = Literal["clip"]
+ModelType = Literal["clip", "vlm"]
 
 app = typer.Typer()
 
@@ -79,7 +82,7 @@ def format_loss_log(
     lut_smoothness: float,
 ) -> str:
     """Format a detailed loss log message."""
-    log_msg = f"Step {step}: Loss = {total_loss.item():.4f} (CLIP: {loss_components['clip'].item():.4f}"
+    log_msg = f"Step {step}: Loss = {total_loss.item():.4f} (Primary: {loss_components['primary'].item():.4f}"
 
     if image_smoothness > 0 and "img_smooth" in loss_components:
         log_msg += (
@@ -180,10 +183,13 @@ def optimize(
     device = get_device(allow_mps=False)
     print(f"Using device: {device}")
 
+    # Select image size based on model type
+    image_size = VLM_IMAGE_SIZE if model_type == "vlm" else CLIP_IMAGE_SIZE
+
     # Create dataset
-    dataset = ImageDataset(image_folder)
+    dataset = ImageDataset(image_folder, image_size=image_size)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    print(f"Loaded {len(dataset)} images from {image_folder}")
+    print(f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})")
 
     if test_image is None or len(test_image) == 0:
         # Pick a random sample image for logging (keep on CPU initially)
@@ -199,6 +205,8 @@ def optimize(
     # Create loss function
     if model_type == "clip":
         loss_fn = CLIPLoss(prompt, device=device)
+    elif model_type == "vlm":
+        loss_fn = VLMLoss(prompt, device=device)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
