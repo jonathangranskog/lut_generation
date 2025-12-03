@@ -71,17 +71,20 @@ python main.py optimize [OPTIONS]
 - `--lut-size INT`: LUT resolution (default: 16). Higher = more detailed, but more prone to banding artifacts
 - `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
+- `--grayscale`: Optimize a black-and-white LUT (single channel) that outputs same intensity for RGB (default: False)
 - `--image-smoothness FLOAT`: Image-space anti-banding strength (default: 1.0)
 - `--image-regularization FLOAT`: Keep changes subtle (default: 1.0)
 - `--black-preservation FLOAT`: Retain black values to reduce fading (default: 1.0)
-- `--lut-smoothness FLOAT`: LUT-space anti-banding strength (default: 1.0) 
+- `--lut-smoothness FLOAT`: LUT-space anti-banding strength (default: 1.0)
 - `--batch-size INT`: Batch size (default: 4)
 - `--log-interval INT`: Save progress every N steps (default: 50, 0 to disable)
 - `--output-path PATH`: Output .cube file (default: "lut.cube")
 - `--test-image PATH`: Image to apply LUT to during logging (repeat flag for multiple images, default picks a random training image)
 - `--verbose`: Show detailed loss breakdown every 10 steps
 
-**Example:**
+**Examples:**
+
+Standard color LUT:
 ```bash
 python main.py optimize \
   --prompt "cinematic teal and orange" \
@@ -95,6 +98,17 @@ python main.py optimize \
   --test-image photo1.jpg \
   --test-image photo2.jpg \
   --verbose
+```
+
+Black-and-white LUT with grayscale optimization:
+```bash
+python main.py optimize \
+  --prompt "black and white noir film" \
+  --image-folder images_resized/ \
+  --grayscale \
+  --lut-size 32 \
+  --steps 500 \
+  --output-path noir_bw.cube
 ```
 
 ### `infer` - Apply a LUT
@@ -134,6 +148,27 @@ Watch the verbose output to see how each contributes:
 ```
 Step 100: Loss = 0.7935 (CLIP: 0.7905, Smooth: 0.0004, Reg: 0.0017, Black: 0.0000, LUT Smooth: 0.0008)
 ```
+
+### Grayscale LUT Mode
+
+The `--grayscale` flag enables optimization of black-and-white LUTs:
+
+**How it works:**
+- Optimizes a single-channel LUT instead of 3 channels (R, G, B separately)
+- Uses Rec. 709 luminance coefficients: `Y = 0.2126×R + 0.7152×G + 0.0722×B`
+- Reduces parameters by 3×, making optimization faster and more memory-efficient
+- Output images always have 3 channels with R=G=B (equal intensity across all channels)
+
+**When to use:**
+- Creating black-and-white film looks
+- Optimizing contrast curves for grayscale images
+- Any effect where color information should be removed
+- Faster experimentation due to reduced parameter count
+
+**Saved LUT format:**
+- LUT files are saved as standard 3-channel .cube files with replicated values
+- Fully compatible with any software that reads .cube files
+- Can be applied to both color and grayscale images
 
 # Limitations
 
