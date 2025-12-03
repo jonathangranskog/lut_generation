@@ -71,17 +71,20 @@ python main.py optimize [OPTIONS]
 - `--lut-size INT`: LUT resolution (default: 16). Higher = more detailed, but more prone to banding artifacts
 - `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
+- `--grayscale`: Optimize a black-and-white LUT (single channel) that outputs same intensity for RGB (default: False)
 - `--image-smoothness FLOAT`: Image-space anti-banding strength (default: 1.0)
 - `--image-regularization FLOAT`: Keep changes subtle (default: 1.0)
 - `--black-preservation FLOAT`: Retain black values to reduce fading (default: 1.0)
-- `--lut-smoothness FLOAT`: LUT-space anti-banding strength (default: 1.0) 
+- `--lut-smoothness FLOAT`: LUT-space anti-banding strength (default: 1.0)
 - `--batch-size INT`: Batch size (default: 4)
 - `--log-interval INT`: Save progress every N steps (default: 50, 0 to disable)
 - `--output-path PATH`: Output .cube file (default: "lut.cube")
 - `--test-image PATH`: Image to apply LUT to during logging (repeat flag for multiple images, default picks a random training image)
 - `--verbose`: Show detailed loss breakdown every 10 steps
 
-**Example:**
+**Examples:**
+
+Standard color LUT:
 ```bash
 python main.py optimize \
   --prompt "cinematic teal and orange" \
@@ -95,6 +98,17 @@ python main.py optimize \
   --test-image photo1.jpg \
   --test-image photo2.jpg \
   --verbose
+```
+
+Black-and-white LUT with grayscale optimization:
+```bash
+python main.py optimize \
+  --prompt "black and white noir film" \
+  --image-folder images_resized/ \
+  --grayscale \
+  --lut-size 32 \
+  --steps 500 \
+  --output-path noir_bw.cube
 ```
 
 ### `infer` - Apply a LUT
