@@ -64,13 +64,14 @@ def compute_losses(
     transformed_images: torch.Tensor,
     original_images: torch.Tensor,
     lut_tensor: torch.Tensor,
+    image_text_weight: float,
     image_smoothness: float,
     image_regularization: float,
     black_preservation: float,
     lut_smoothness: float,
 ) -> tuple[torch.Tensor, dict]:
     primary_loss = loss_fn(transformed_images)
-    loss = primary_loss
+    loss = image_text_weight * primary_loss
     loss_components = {"primary": primary_loss}
 
     if image_smoothness > 0:

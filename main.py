@@ -76,13 +76,14 @@ def format_loss_log(
     step: int,
     total_loss: torch.Tensor,
     loss_components: dict,
+    image_text_weight: float,
     image_smoothness: float,
     image_regularization: float,
     black_preservation: float,
     lut_smoothness: float,
 ) -> str:
     """Format a detailed loss log message."""
-    log_msg = f"Step {step}: Loss = {total_loss.item():.4f} (Primary: {loss_components['primary'].item():.4f}"
+    log_msg = f"Step {step}: Loss = {total_loss.item():.4f} (Primary: {(image_text_weight * loss_components['primary']).item():.4f}"
 
     if image_smoothness > 0 and "img_smooth" in loss_components:
         log_msg += (
@@ -160,6 +161,7 @@ def optimize(
     steps: int = 500,
     batch_size: int = 4,
     learning_rate: float = 5e-3,
+    image_text_weight: float = 1.0,
     image_smoothness: float = 1.0,
     image_regularization: float = 1.0,
     black_preservation: float = 1.0,
@@ -173,6 +175,7 @@ def optimize(
     """
     Optimize a LUT given a small dataset of images and a prompt.
 
+    Image text weight controls the contribution of the main image-text alignment loss (CLIP or VLM).
     Image smoothness penalizes banding and discontinuities in output images.
     Image regularization keeps output images close to input images (subtle changes).
     Black preservation prevents faded/lifted blacks (maintains deep shadows).
@@ -249,6 +252,7 @@ def optimize(
                 transformed_images,
                 images,
                 lut_tensor,
+                image_text_weight,
                 image_smoothness,
                 image_regularization,
                 black_preservation,
@@ -289,6 +293,7 @@ def optimize(
                     step,
                     loss,
                     loss_components,
+                    image_text_weight,
                     image_smoothness,
                     image_regularization,
                     black_preservation,
