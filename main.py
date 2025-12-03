@@ -22,9 +22,11 @@ from tqdm import tqdm
 from typing_extensions import Annotated
 
 from models.clip import CLIPLoss
+from models.sds import SDSLoss
 from models.vlm import VLMLoss
 from utils import (
     CLIP_IMAGE_SIZE,
+    DEEPFLOYD_IMAGE_SIZE,
     VLM_IMAGE_SIZE,
     ImageDataset,
     apply_lut,
@@ -39,7 +41,7 @@ from utils import (
     write_cube_file,
 )
 
-ModelType = Literal["clip", "vlm"]
+ModelType = Literal["clip", "vlm", "sds"]
 
 app = typer.Typer()
 
@@ -155,7 +157,7 @@ def save_training_checkpoint(
 def optimize(
     prompt: Annotated[str, typer.Option(help="The prompt to optimize the LUT for.")],
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
-    model_type: Annotated[ModelType, typer.Option(help="Model (clip)")] = "clip",
+    model_type: Annotated[ModelType, typer.Option(help="Model type: clip, vlm, or sds")] = "clip",
     lut_size: int = 16,
     steps: int = 500,
     batch_size: int = 4,
@@ -169,6 +171,10 @@ def optimize(
     output_path: str = "lut.cube",
     test_image: list[str] | None = None,
     grayscale: bool = False,
+    # SDS-specific options
+    sds_guidance_scale: float = 20.0,
+    sds_min_timestep: int = 20,
+    sds_max_timestep: int = 980,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
@@ -178,13 +184,23 @@ def optimize(
     Black preservation prevents faded/lifted blacks (maintains deep shadows).
     Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
     Grayscale optimizes a black-and-white LUT (single channel) that outputs same intensity for RGB.
+
+    SDS-specific options (only used when model_type='sds'):
+    - sds_guidance_scale: Classifier-free guidance scale (default 20.0)
+    - sds_min_timestep: Minimum diffusion timestep (default 20)
+    - sds_max_timestep: Maximum diffusion timestep (default 980)
     """
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
     print(f"Using device: {device}")
 
     # Select image size based on model type
-    image_size = VLM_IMAGE_SIZE if model_type == "vlm" else CLIP_IMAGE_SIZE
+    if model_type == "vlm":
+        image_size = VLM_IMAGE_SIZE
+    elif model_type == "sds":
+        image_size = DEEPFLOYD_IMAGE_SIZE
+    else:
+        image_size = CLIP_IMAGE_SIZE
 
     # Create dataset
     dataset = ImageDataset(image_folder, image_size=image_size)
@@ -207,6 +223,14 @@ def optimize(
         loss_fn = CLIPLoss(prompt, device=device)
     elif model_type == "vlm":
         loss_fn = VLMLoss(prompt, device=device)
+    elif model_type == "sds":
+        loss_fn = SDSLoss(
+            prompt,
+            device=device,
+            guidance_scale=sds_guidance_scale,
+            min_timestep=sds_min_timestep,
+            max_timestep=sds_max_timestep,
+        )
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 

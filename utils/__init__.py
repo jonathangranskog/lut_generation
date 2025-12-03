@@ -1,6 +1,11 @@
 """Utility functions and classes for LUT generation and manipulation."""
 
-from .constants import CLIP_IMAGE_SIZE, VLM_IMAGE_SIZE
+from .constants import (
+    CLIP_IMAGE_SIZE,
+    DEEPFLOYD_IMAGE_SIZE,
+    DEEPFLOYD_UNET_SIZE,
+    VLM_IMAGE_SIZE,
+)
 from .dataset import ImageDataset
 from .device import get_device
 from .image import pil_to_tensor, save_tensor_as_image, tensor_to_pil
@@ -17,6 +22,8 @@ from .transforms import apply_lut, identity_lut, postprocess_lut
 __all__ = [
     # Constants
     "CLIP_IMAGE_SIZE",
+    "DEEPFLOYD_IMAGE_SIZE",
+    "DEEPFLOYD_UNET_SIZE",
     "VLM_IMAGE_SIZE",
     # LUT I/O
     "load_image_as_tensor",

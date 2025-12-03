@@ -13,3 +13,11 @@ VLM_IMAGE_SIZE = 448  # Balance between quality and memory/speed (native is 896)
 REC709_LUMA_R = 0.2126
 REC709_LUMA_G = 0.7152
 REC709_LUMA_B = 0.0722
+
+# DeepFloyd IF constants for Score Distillation Sampling (SDS)
+# Stage I UNet operates at 64x64 pixel resolution, but we sample higher-res crops
+# from the dataset to preserve scene context, then downsample before the UNet
+DEEPFLOYD_UNET_SIZE = 64  # Native UNet resolution
+DEEPFLOYD_IMAGE_SIZE = 256  # Dataset crop size (higher res for context)
+DEEPFLOYD_STAGE1_MODEL = "DeepFloyd/IF-I-XL-v1.0"  # 4.3B params
+DEEPFLOYD_STAGE1_MODEL_MEDIUM = "DeepFloyd/IF-I-M-v1.0"  # Smaller variant
