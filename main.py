@@ -108,6 +108,7 @@ def save_training_checkpoint(
     lut_tensor: torch.Tensor,
     sample_images: list[torch.Tensor],
     output_dir: Path,
+    grayscale: bool = False,
 ) -> None:
     """
     Save LUT and sample transformed images for training monitoring.
@@ -117,6 +118,7 @@ def save_training_checkpoint(
         lut_tensor: Current LUT state
         sample_images: List of sample image tensors, each (C, H, W) in [0, 1] range
         output_dir: Directory to save checkpoints
+        grayscale: Whether to save LUT with replicated grayscale channel
     """
     # Create checkpoint directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -129,6 +131,7 @@ def save_training_checkpoint(
         domain_min=[0.0, 0.0, 0.0],
         domain_max=[1.0, 1.0, 1.0],
         title=f"Training Step {step}",
+        grayscale=grayscale,
     )
 
     # Apply LUT to each sample image and save
@@ -162,6 +165,7 @@ def optimize(
     verbose: bool = False,
     output_path: str = "lut.cube",
     test_image: list[str] | None = None,
+    grayscale: bool = False,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
@@ -170,6 +174,7 @@ def optimize(
     Image regularization keeps output images close to input images (subtle changes).
     Black preservation prevents faded/lifted blacks (maintains deep shadows).
     Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
+    Grayscale optimizes a black-and-white LUT (single channel) that outputs same intensity for RGB.
     """
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
@@ -198,7 +203,7 @@ def optimize(
         raise ValueError(f"Unknown model type: {model_type}")
 
     # Create LUT (trainable!)
-    lut_tensor = identity_lut(lut_size).to(device)
+    lut_tensor = identity_lut(lut_size, grayscale=grayscale).to(device)
     lut_tensor.requires_grad = True
 
     # Create optimizer for LUT parameters
@@ -261,7 +266,11 @@ def optimize(
             if log_interval > 0 and step % log_interval == 0:
                 sample_images_device = [img.to(device) for img in sample_images_cpu]
                 save_training_checkpoint(
-                    step, postprocess_lut(lut_tensor), sample_images_device, log_dir
+                    step,
+                    postprocess_lut(lut_tensor),
+                    sample_images_device,
+                    log_dir,
+                    grayscale,
                 )
                 if verbose:
                     print(f"  → Saved checkpoint to {log_dir}/")
@@ -293,7 +302,7 @@ def optimize(
     if log_interval > 0:
         sample_images_device = [img.to(device) for img in sample_images_cpu]
         save_training_checkpoint(
-            step, postprocess_lut(lut_tensor), sample_images_device, log_dir
+            step, postprocess_lut(lut_tensor), sample_images_device, log_dir, grayscale
         )
         print(f"Saved final checkpoint to {log_dir}/")
 
@@ -308,6 +317,7 @@ def optimize(
         domain_min,
         domain_max,
         title=f"CLIP: {prompt}",
+        grayscale=grayscale,
     )
     print(f"LUT saved to {output_path}")
 
