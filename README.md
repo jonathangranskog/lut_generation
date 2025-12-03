@@ -149,27 +149,6 @@ Watch the verbose output to see how each contributes:
 Step 100: Loss = 0.7935 (CLIP: 0.7905, Smooth: 0.0004, Reg: 0.0017, Black: 0.0000, LUT Smooth: 0.0008)
 ```
 
-### Grayscale LUT Mode
-
-The `--grayscale` flag enables optimization of black-and-white LUTs:
-
-**How it works:**
-- Optimizes a single-channel LUT instead of 3 channels (R, G, B separately)
-- Uses Rec. 709 luminance coefficients: `Y = 0.2126×R + 0.7152×G + 0.0722×B`
-- Reduces parameters by 3×, making optimization faster and more memory-efficient
-- Output images always have 3 channels with R=G=B (equal intensity across all channels)
-
-**When to use:**
-- Creating black-and-white film looks
-- Optimizing contrast curves for grayscale images
-- Any effect where color information should be removed
-- Faster experimentation due to reduced parameter count
-
-**Saved LUT format:**
-- LUT files are saved as standard 3-channel .cube files with replicated values
-- Fully compatible with any software that reads .cube files
-- Can be applied to both color and grayscale images
-
 # Limitations
 
 ### Accuracy
