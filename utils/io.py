@@ -97,21 +97,30 @@ def write_cube_file(
     domain_min: list = [0.0, 0.0, 0.0],
     domain_max: list = [1.0, 1.0, 1.0],
     title: str = "Generated LUT",
+    grayscale: bool = False,
 ) -> None:
     """
     Save a PyTorch LUT tensor to a .cube file
 
     Args:
         lut_path: Path where the .cube file will be saved
-        lut_tensor: LUT tensor of shape (size, size, size, 3)
+        lut_tensor: LUT tensor of shape (size, size, size, 3) or (size, size, size, 1) for grayscale
         domain_min: Minimum domain values (default [0.0, 0.0, 0.0])
         domain_max: Maximum domain values (default [1.0, 1.0, 1.0])
         title: Optional title for the LUT file
+        grayscale: If True, replicates single-channel LUT to 3 channels (R=G=B) when saving
     """
-    assert lut_tensor.ndim == 4, "LUT tensor must be 4D (size, size, size, 3)"
-    assert lut_tensor.shape[-1] == 3, "LUT tensor must have 3 channels (RGB)"
+    assert lut_tensor.ndim == 4, "LUT tensor must be 4D (size, size, size, C)"
+    assert lut_tensor.shape[-1] in [1, 3], "LUT tensor must have 1 or 3 channels"
     assert len(domain_min) == 3, "Domain min must be a 3-element list"
     assert len(domain_max) == 3, "Domain max must be a 3-element list"
+
+    # If grayscale and single-channel, replicate to 3 channels
+    if grayscale and lut_tensor.shape[-1] == 1:
+        lut_tensor = lut_tensor.repeat(1, 1, 1, 3)  # (size, size, size, 3)
+
+    # Ensure we have 3 channels after potential replication
+    assert lut_tensor.shape[-1] == 3, "LUT tensor must have 3 channels after grayscale replication"
 
     lut_size = lut_tensor.shape[0]
 
