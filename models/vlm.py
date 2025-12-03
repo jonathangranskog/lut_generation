@@ -40,7 +40,7 @@ class VLMLoss(nn.Module):
         model_name: str = "google/gemma-3-4b-it",
         device: str = "cuda",
         dtype: torch.dtype | None = None,
-        question_template: str = "Does this image have a {prompt} color grade?",
+        question_template: str = "Does the color grade of this image match the following prompt '{prompt}'?",
         answer: str = "Yes",
     ):
         """
@@ -73,7 +73,7 @@ class VLMLoss(nn.Module):
         self.model = Gemma3ForConditionalGeneration.from_pretrained(
             model_name,
             device_map=device,
-            torch_dtype=dtype,
+            dtype=self.dtype,
         )
         self.processor = AutoProcessor.from_pretrained(model_name)
 
