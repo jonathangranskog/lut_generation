@@ -266,7 +266,11 @@ def optimize(
             if log_interval > 0 and step % log_interval == 0:
                 sample_images_device = [img.to(device) for img in sample_images_cpu]
                 save_training_checkpoint(
-                    step, postprocess_lut(lut_tensor), sample_images_device, log_dir, grayscale
+                    step,
+                    postprocess_lut(lut_tensor),
+                    sample_images_device,
+                    log_dir,
+                    grayscale,
                 )
                 if verbose:
                     print(f"  → Saved checkpoint to {log_dir}/")

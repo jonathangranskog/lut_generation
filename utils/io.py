@@ -120,7 +120,9 @@ def write_cube_file(
         lut_tensor = lut_tensor.repeat(1, 1, 1, 3)  # (size, size, size, 3)
 
     # Ensure we have 3 channels after potential replication
-    assert lut_tensor.shape[-1] == 3, "LUT tensor must have 3 channels after grayscale replication"
+    assert lut_tensor.shape[-1] == 3, (
+        "LUT tensor must have 3 channels after grayscale replication"
+    )
 
     lut_size = lut_tensor.shape[0]
 
