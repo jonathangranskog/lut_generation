@@ -171,6 +171,7 @@ def optimize(
     output_path: str = "lut.cube",
     test_image: list[str] | None = None,
     grayscale: bool = False,
+    vlm_comparison_mode: bool = False,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
@@ -181,6 +182,7 @@ def optimize(
     Black preservation prevents faded/lifted blacks (maintains deep shadows).
     Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
     Grayscale optimizes a black-and-white LUT (single channel) that outputs same intensity for RGB.
+    VLM comparison mode (only for VLM): compares original and transformed images to assess transformation quality.
     """
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
@@ -207,9 +209,11 @@ def optimize(
 
     # Create loss function
     if model_type == "clip":
+        if vlm_comparison_mode:
+            print("Warning: vlm_comparison_mode is ignored for CLIP model type")
         loss_fn = CLIPLoss(prompt, device=device)
     elif model_type == "vlm":
-        loss_fn = VLMLoss(prompt, device=device)
+        loss_fn = VLMLoss(prompt, device=device, comparison_mode=vlm_comparison_mode)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
