@@ -96,13 +96,8 @@ Standard color LUT with CLIP:
 ```bash
 python main.py optimize \
   --prompt "cinematic teal and orange" \
-  --image-folder images_resized/ \
+  --image-folder images/ \
   --model-type clip \
-  --lut-size 32 \
-  --steps 500 \
-  --learning-rate 0.005 \
-  --image-smoothness 1.0 \
-  --image-regularization 1.0 \
   --output-path cinematic.cube \
   --test-image photo1.jpg \
   --test-image photo2.jpg \
@@ -113,11 +108,9 @@ VLM with context-aware transformations:
 ```bash
 python main.py optimize \
   --prompt "warm golden hour" \
-  --image-folder images_resized/ \
+  --image-folder images/ \
   --model-type gemma3_12b \
-  --lut-size 32 \
-  --steps 1000 \
-  --batch-size 2 \
+  --batch-size 1 \
   --output-path golden_hour.cube
 ```
 
@@ -125,9 +118,8 @@ Black-and-white LUT with grayscale optimization:
 ```bash
 python main.py optimize \
   --prompt "black and white noir film" \
-  --image-folder images_resized/ \
+  --image-folder images/ \
   --grayscale \
-  --lut-size 32 \
   --steps 500 \
   --output-path noir_bw.cube
 ```
