@@ -213,6 +213,10 @@ class SDSLoss(nn.Module):
                 return_dict=False,
             )[0]
 
+        # DeepFloyd IF predicts both noise (first 3 channels) and variance (last 3 channels)
+        # We only need the noise prediction for SDS
+        noise_pred = noise_pred[:, :3, :, :]
+
         # Split predictions for CFG
         noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
 
