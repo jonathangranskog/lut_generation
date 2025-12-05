@@ -1,4 +1,4 @@
-# LUT Generation (🚧 WIP 🚧)
+# LUT Generation
 
 Generate custom 3D LUTs (Look-Up Tables) for color grading using AI-guided optimization. Transform your images to match any text prompt (e.g., "golden hour", "cinematic teal and orange", "vintage film").
 
