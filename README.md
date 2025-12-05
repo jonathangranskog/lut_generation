@@ -6,8 +6,8 @@ Note: a lot of vibe-coding was used to write this code.
 
 ## Features
 
-- 🎨 **Text-to-LUT**: Generate LUTs from natural language prompts using CLIP or Gemma 3
-- 🤖 **Multiple Models**: Choose from CLIP or Gemma 3 (4B, 12B, 27B) for different quality/speed tradeoffs
+- 🎨 **Text-to-LUT**: Generate LUTs from natural language prompts using CLIP, Gemma 3, or DeepFloyd IF
+- 🤖 **Multiple Models**: Choose from CLIP, Gemma 3 (4B, 12B, 27B), or SDS for different quality/speed tradeoffs
 - 🔍 **Context-Aware VLM**: Gemma 3 models evaluate transformations by comparing before/after images
 - 🔧 **Export format**: Exports standard .cube files compatible with most photo/video software
 - ⚡ **GPU & CPU support**: Works with CUDA, MPS (Apple Silicon), or CPU
@@ -75,6 +75,7 @@ python main.py optimize [OPTIONS]
   - `gemma3_4b`: Gemma 3 4B (fastest VLM, context-aware transformations)
   - `gemma3_12b`: Gemma 3 12B (balanced, recommended for VLM)
   - `gemma3_27b`: Gemma 3 27B (highest quality, slowest)
+  - `sds`: Score Distillation Sampling with DeepFloyd IF (pixel-space diffusion model)
   - Note: Gemma models compare original vs transformed images. They work best for precise minute LUTs.
 - `--lut-size INT`: LUT resolution (default: 16). Higher = more detailed, but more prone to banding artifacts
 - `--steps INT`: Training iterations (default: 500)
@@ -112,6 +113,15 @@ python main.py optimize \
   --model-type gemma3_12b \
   --batch-size 1 \
   --output-path golden_hour.cube
+```
+
+SDS with DeepFloyd IF:
+```bash
+python main.py optimize \
+  --prompt "kodak portra 400 film" \
+  --image-folder images/ \
+  --model-type sds \
+  --output-path portra.cube
 ```
 
 Black-and-white LUT with grayscale optimization:
@@ -174,7 +184,6 @@ Higher resolution or long training of LUTs might lead to banding artifacts. To c
 
 # Future Improvements
 
-* SDS optimization (like in [DreamFusion](https://dreamfusion3d.github.io/))
 * Better regularization so more complex LUTs can be generated
 * Other representations besides LUTs
 * Large-scale LUT library generation
