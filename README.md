@@ -71,7 +71,7 @@ python main.py optimize [OPTIONS]
 
 **Key Options:**
 - `--model-type`: Model to use (default: "clip")
-  - `clip`: CLIP ViT-L/14 (RECOMMENDED: fast, great quality, evaluates final image only)
+  - `clip`: CLIP ViT-B/32 (RECOMMENDED: fast, great quality, evaluates final image only)
   - `gemma3_4b`: Gemma 3 4B (fastest VLM, context-aware transformations)
   - `gemma3_12b`: Gemma 3 12B (balanced, recommended for VLM)
   - `gemma3_27b`: Gemma 3 27B (highest quality, slowest)
