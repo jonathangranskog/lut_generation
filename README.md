@@ -164,7 +164,7 @@ python main.py infer \
 
 During optimization, the total loss consists of:
 
-1. **Image-text Loss** (~0.6-0.9): Semantic similarity to text prompt
+1. **Image-text Loss** (dependent on model): Semantic similarity to text prompt
 2. **Image Smoothness** (0.0-0.01): Prevents banding and posterization
 3. **Image Regularization** (0.0-0.1): Keeps output close to input (subtle changes)
 4. **Black Preservation** (~0.0-0.0001): Retains black levels
