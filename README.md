@@ -123,7 +123,8 @@ python main.py optimize \
   --image-folder images/ \
   --model-type sds \
   --output-path portra.cube \
-  --image-text-weight 10.0
+  --image-text-weight 10.0 \
+  --batch-size 1
 ```
 
 Black-and-white LUT with grayscale optimization:
