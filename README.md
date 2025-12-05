@@ -187,8 +187,6 @@ Higher resolution or long training of LUTs might lead to banding artifacts. To c
 * Other representations besides LUTs
 * Large-scale LUT library generation
 
-For more details on Gemma 3 context-aware evaluation, see [COMPARISON_MODE_USAGE.md](COMPARISON_MODE_USAGE.md).
-
 ## License
 
 MIT.
