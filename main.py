@@ -211,10 +211,12 @@ def optimize(
     # Create loss function
     if model_type == "clip":
         loss_fn = CLIPLoss(prompt, device=device)
-    else:
+    elif model_type in ["gemma3_4b", "gemma3_12b", "gemma3_27b"]:
         # All other model types are VLM models (gemma3_4b, gemma3_12b, gemma3_27b)
         # VLM models use comparison mode to evaluate transformations
         loss_fn = VLMLoss(prompt, model_name=model_type, device=device)
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
 
     # Create LUT (trainable!)
     lut_tensor = identity_lut(lut_size, grayscale=grayscale).to(device)
