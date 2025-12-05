@@ -193,5 +193,6 @@ Higher resolution or long training of LUTs might lead to banding artifacts. To c
 
 # License
 
-MIT.
+The code is licensed under the MIT License.
 
+Note that [Gemma](https://ai.google.dev/gemma/terms) and [DeepFloydIF](https://huggingface.co/spaces/DeepFloyd/deepfloyd-if-license) have their own licenses that you must follow if you use them.
