@@ -38,9 +38,9 @@ class SDSLoss(nn.Module):
         model_name: str = DEEPFLOYD_STAGE1_MODEL,
         device: str = "cuda",
         dtype: torch.dtype | None = None,
-        guidance_scale: float = 20.0,
+        guidance_scale: float = 50.0,
         min_timestep: int = 20,
-        max_timestep: int = 980,
+        max_timestep: int = 800,
         use_medium_model: bool = False,
     ):
         """
@@ -51,7 +51,7 @@ class SDSLoss(nn.Module):
             model_name: HuggingFace model identifier for DeepFloyd IF Stage I
             device: Device to run the model on
             dtype: Model dtype (None = auto-select: float16 for CUDA, float32 for CPU)
-            guidance_scale: Classifier-free guidance scale (default 20.0 for SDS)
+            guidance_scale: Classifier-free guidance scale (default 50.0)
             min_timestep: Minimum timestep for noise sampling (avoid very clean images)
             max_timestep: Maximum timestep for noise sampling (avoid pure noise)
             use_medium_model: Use smaller IF-I-M-v1.0 model (less VRAM, faster)

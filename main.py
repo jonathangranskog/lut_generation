@@ -176,10 +176,6 @@ def optimize(
     output_path: str = "lut.cube",
     test_image: list[str] | None = None,
     grayscale: bool = False,
-    # SDS-specific options
-    sds_guidance_scale: float = 20.0,
-    sds_min_timestep: int = 20,
-    sds_max_timestep: int = 980,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
@@ -193,11 +189,6 @@ def optimize(
 
     Note: Gemma 3 models use comparison mode by default, evaluating transformations by comparing
     original and transformed images for more context-aware color grading.
-
-    SDS-specific options (only used when model_type='sds'):
-    - sds_guidance_scale: Classifier-free guidance scale (default 20.0)
-    - sds_min_timestep: Minimum diffusion timestep (default 20)
-    - sds_max_timestep: Maximum diffusion timestep (default 980)
     """
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
@@ -235,13 +226,7 @@ def optimize(
         # VLM models use comparison mode to evaluate transformations
         loss_fn = VLMLoss(prompt, model_name=model_type, device=device)
     elif model_type == "sds":
-        loss_fn = SDSLoss(
-            prompt,
-            device=device,
-            guidance_scale=sds_guidance_scale,
-            min_timestep=sds_min_timestep,
-            max_timestep=sds_max_timestep,
-        )
+        loss_fn = SDSLoss(prompt, device=device)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
