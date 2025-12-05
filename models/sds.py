@@ -132,11 +132,14 @@ class SDSLoss(nn.Module):
         the dataset to preserve scene context, then downsampled here to 64x64
         for the UNet.
 
+        Note: We keep images in float32 for gradient computation. Only the UNet
+        forward pass uses float16.
+
         Args:
             images: Batch of images in [0, 1] range, shape (B, C, H, W)
 
         Returns:
-            Preprocessed images in [-1, 1] range at 64x64 resolution
+            Preprocessed images in [-1, 1] range at 64x64 resolution (float32)
         """
         # Resize to IF Stage I UNet resolution (64x64)
         # Input images may be higher resolution (e.g., 256x256) for context
@@ -149,9 +152,10 @@ class SDSLoss(nn.Module):
             )
 
         # Convert from [0, 1] to [-1, 1] (IF expects this range)
+        # Keep in float32 for gradient computation
         images = images * 2.0 - 1.0
 
-        return images.to(self.dtype)
+        return images
 
     def forward(
         self, images: torch.Tensor, original_images: torch.Tensor | None = None
@@ -205,9 +209,10 @@ class SDSLoss(nn.Module):
         combined_timesteps = torch.cat([timesteps, timesteps], dim=0)
 
         # Get noise prediction from UNet (no gradients through UNet)
+        # Convert to model dtype (float16) for UNet, then back to float32
         with torch.no_grad():
             noise_pred = self.unet(
-                combined_noisy,
+                combined_noisy.to(self.dtype),
                 combined_timesteps,
                 encoder_hidden_states=combined_embeds,
                 return_dict=False,
@@ -215,7 +220,8 @@ class SDSLoss(nn.Module):
 
         # DeepFloyd IF predicts both noise (first 3 channels) and variance (last 3 channels)
         # We only need the noise prediction for SDS
-        noise_pred = noise_pred[:, :3, :, :]
+        # Convert back to float32 for gradient computation
+        noise_pred = noise_pred[:, :3, :, :].float()
 
         # Split predictions for CFG
         noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
@@ -228,7 +234,7 @@ class SDSLoss(nn.Module):
         # Compute weighting factor w(t)
         # Common choice: w(t) = sigma_t^2 (related to SNR)
         # We use a simplified constant weighting here
-        w = 1.0 - self.alphas_cumprod[timesteps].view(-1, 1, 1, 1)
+        w = (1.0 - self.alphas_cumprod[timesteps]).float().view(-1, 1, 1, 1)
 
         # SDS gradient: (noise_pred - noise) * w
         # We create a pseudo-loss that has this gradient
