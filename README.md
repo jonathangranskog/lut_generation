@@ -1,10 +1,10 @@
 # LUT Generation
 
-![LUT Generation Banner](assets/banner.png)
-
 Generate custom 3D LUTs (Look-Up Tables) for color grading using AI-guided optimization. Transform your images to match any text prompt (e.g., "golden hour", "cinematic teal and orange", "vintage film").
 
 Note: a lot of vibe-coding was used to write this code.
+
+![LUT Generation Banner](assets/banner.png)
 
 ## Features
 
