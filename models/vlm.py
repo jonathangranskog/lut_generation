@@ -34,9 +34,9 @@ class VLMLoss(nn.Module):
     """
     VLM-based loss for image-text alignment via contrastive Yes/No scoring.
 
-    Supports two modes:
-    1. Assessment mode: "Does this image look like {prompt}?"
-    2. Comparison mode: "Has the color grade {prompt} been applied to transform the first image into the second?"
+    Uses comparison mode: evaluates if the color grade has been successfully applied
+    to transform the original image into the transformed image. This provides better
+    context-aware gradients than assessing the final image alone.
 
     Computes a contrastive loss based on log P(Yes) - log P(No). This normalizes out
     model biases and provides a cleaner gradient signal than just optimizing for P(Yes).
@@ -48,7 +48,6 @@ class VLMLoss(nn.Module):
         model_name: str = "gemma3_12b",
         device: str = "cuda",
         dtype: torch.dtype | None = None,
-        comparison_mode: bool = False,
         question_template: str | None = None,
     ):
         """
@@ -60,8 +59,7 @@ class VLMLoss(nn.Module):
                        or a full HuggingFace model identifier (e.g., "google/gemma-3-12b-it")
             device: Device to run the model on
             dtype: Model dtype (None = auto-select: bfloat16 for CUDA, float32 for CPU)
-            comparison_mode: If True, compare original vs transformed images. If False, assess single image.
-            question_template: Custom question template (None = use default for mode)
+            question_template: Custom question template (None = use default comparison question)
         """
         super().__init__()
 
@@ -72,14 +70,10 @@ class VLMLoss(nn.Module):
         else:
             self.dtype = dtype
         self.prompt = prompt
-        self.comparison_mode = comparison_mode
 
-        # Set default question templates based on mode
+        # Set default question template (comparison mode)
         if question_template is None:
-            if comparison_mode:
-                question_template = "Looking at these two images, has the '{prompt}' color grade been successfully applied to transform the first image into the second? Answer Yes or No."
-            else:
-                question_template = "Does this image have the color grade or look of '{prompt}'? Answer Yes or No."
+            question_template = "Looking at these two images, has the '{prompt}' color grade been successfully applied to transform the first image into the second? Answer Yes or No."
 
         self.question = question_template.format(prompt=prompt)
 
@@ -119,20 +113,14 @@ class VLMLoss(nn.Module):
         self._prepare_prompt()
 
         print(f"VLM initialized for prompt: '{prompt}'")
-        print(f"  Mode: {'Comparison' if comparison_mode else 'Assessment'}")
         print(f"  Question: {self.question}")
         print(f"  Yes token ID: {self.yes_token_id}, No token ID: {self.no_token_id}")
 
     def _prepare_prompt(self):
-        """Pre-compute input_ids and Yes/No token IDs."""
-        # Format the prompt with question
-        # In comparison mode, use two image tokens
-        if self.comparison_mode:
-            image_token = GEMMA_IMAGE_TOKEN + GEMMA_IMAGE_TOKEN
-            num_images = 2
-        else:
-            image_token = GEMMA_IMAGE_TOKEN
-            num_images = 1
+        """Pre-compute input_ids and Yes/No token IDs for comparison mode (2 images)."""
+        # Format the prompt with question using two image tokens
+        image_token = GEMMA_IMAGE_TOKEN + GEMMA_IMAGE_TOKEN
+        num_images = 2
 
         text = GEMMA_TEMPLATE.format(
             image_token=image_token,
@@ -190,44 +178,35 @@ class VLMLoss(nn.Module):
 
         return normalized
 
-    def forward(self, images: torch.Tensor, original_images: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(self, images: torch.Tensor, original_images: torch.Tensor) -> torch.Tensor:
         """
-        Compute contrastive VLM loss between images and text prompt.
+        Compute contrastive VLM loss between original and transformed images.
 
         Uses log P(No) - log P(Yes) as the loss, which:
         - Normalizes out model biases (if model always favors Yes, it cancels out)
         - Provides cleaner gradients that depend on relative probabilities
-        - Lower loss = model more confident image matches prompt
+        - Lower loss = model more confident transformation matches prompt
 
         Args:
-            images: Batch of (transformed) images in [0, 1] range, shape (B, C, H, W)
-            original_images: Optional batch of original images (required in comparison_mode)
+            images: Batch of transformed images in [0, 1] range, shape (B, C, H, W)
+            original_images: Batch of original images in [0, 1] range, shape (B, C, H, W)
 
         Returns:
             Scalar loss value (log P(No) - log P(Yes), lower is better)
         """
         batch_size = images.shape[0]
 
-        if self.comparison_mode:
-            if original_images is None:
-                raise ValueError("original_images must be provided when comparison_mode=True")
+        # Preprocess both image sets (differentiable)
+        original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
+        transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
 
-            # Preprocess both image sets (differentiable)
-            original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
-            transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
+        # Interleave original and transformed images for the batch
+        # Shape: (B*2, C, H, W) where pairs are [orig_0, trans_0, orig_1, trans_1, ...]
+        pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
+        pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
 
-            # Interleave original and transformed images for the batch
-            # Shape: (B*2, C, H, W) where pairs are [orig_0, trans_0, orig_1, trans_1, ...]
-            pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
-            pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
-
-            # Expand input_ids for batch (each pair shares the same prompt)
-            input_ids = self.input_ids.expand(batch_size, -1)
-        else:
-            # Assessment mode: single image per example
-            pixel_values = self.preprocess_images(images)
-            pixel_values = pixel_values.to(self.dtype)
-            input_ids = self.input_ids.expand(batch_size, -1)
+        # Expand input_ids for batch (each pair shares the same prompt)
+        input_ids = self.input_ids.expand(batch_size, -1)
 
         # Run VLM forward pass
         outputs = self.model.forward(
@@ -252,13 +231,13 @@ class VLMLoss(nn.Module):
 
         return loss
 
-    def compute_probability(self, images: torch.Tensor, original_images: torch.Tensor | None = None) -> torch.Tensor:
+    def compute_probability(self, images: torch.Tensor, original_images: torch.Tensor) -> torch.Tensor:
         """
         Compute probability of Yes answer (higher is better).
 
         Args:
-            images: Batch of (transformed) images in [0, 1] range, shape (B, C, H, W)
-            original_images: Optional batch of original images (required in comparison_mode)
+            images: Batch of transformed images in [0, 1] range, shape (B, C, H, W)
+            original_images: Batch of original images in [0, 1] range, shape (B, C, H, W)
 
         Returns:
             P(Yes) for each image in batch
@@ -266,17 +245,10 @@ class VLMLoss(nn.Module):
         batch_size = images.shape[0]
 
         with torch.no_grad():
-            if self.comparison_mode:
-                if original_images is None:
-                    raise ValueError("original_images must be provided when comparison_mode=True")
-                original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
-                transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
-                pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
-                pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
-            else:
-                pixel_values = self.preprocess_images(images)
-                pixel_values = pixel_values.to(self.dtype)
-
+            original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
+            transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
+            pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
+            pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
             input_ids = self.input_ids.expand(batch_size, -1)
 
             outputs = self.model.forward(
@@ -291,14 +263,14 @@ class VLMLoss(nn.Module):
         return p_yes
 
     def get_yes_no_probs(
-        self, images: torch.Tensor, original_images: torch.Tensor | None = None
+        self, images: torch.Tensor, original_images: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Get both Yes and No probabilities for debugging.
 
         Args:
-            images: Batch of (transformed) images in [0, 1] range, shape (B, C, H, W)
-            original_images: Optional batch of original images (required in comparison_mode)
+            images: Batch of transformed images in [0, 1] range, shape (B, C, H, W)
+            original_images: Batch of original images in [0, 1] range, shape (B, C, H, W)
 
         Returns:
             Tuple of (P(Yes), P(No)) tensors
@@ -306,17 +278,10 @@ class VLMLoss(nn.Module):
         batch_size = images.shape[0]
 
         with torch.no_grad():
-            if self.comparison_mode:
-                if original_images is None:
-                    raise ValueError("original_images must be provided when comparison_mode=True")
-                original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
-                transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
-                pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
-                pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
-            else:
-                pixel_values = self.preprocess_images(images)
-                pixel_values = pixel_values.to(self.dtype)
-
+            original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
+            transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
+            pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
+            pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
             input_ids = self.input_ids.expand(batch_size, -1)
 
             outputs = self.model.forward(
@@ -331,13 +296,13 @@ class VLMLoss(nn.Module):
 
         return p_yes, p_no
 
-    def get_prediction(self, images: torch.Tensor, original_images: torch.Tensor | None = None) -> list[str]:
+    def get_prediction(self, images: torch.Tensor, original_images: torch.Tensor) -> list[str]:
         """
         Get the model's actual predicted answer for debugging.
 
         Args:
-            images: Batch of (transformed) images in [0, 1] range, shape (B, C, H, W)
-            original_images: Optional batch of original images (required in comparison_mode)
+            images: Batch of transformed images in [0, 1] range, shape (B, C, H, W)
+            original_images: Batch of original images in [0, 1] range, shape (B, C, H, W)
 
         Returns:
             List of "Yes" or "No" predictions

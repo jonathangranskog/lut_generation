@@ -70,8 +70,8 @@ def compute_losses(
     black_preservation: float,
     lut_smoothness: float,
 ) -> tuple[torch.Tensor, dict]:
-    # Check if loss function is in comparison mode (VLMLoss with comparison_mode=True)
-    if hasattr(loss_fn, 'comparison_mode') and loss_fn.comparison_mode:
+    # Check if loss function is VLMLoss (requires original images) or CLIP (only needs transformed)
+    if hasattr(loss_fn, 'processor'):  # VLMLoss has processor attribute, CLIPLoss doesn't
         primary_loss = loss_fn(transformed_images, original_images)
     else:
         primary_loss = loss_fn(transformed_images)

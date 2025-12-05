@@ -8,7 +8,7 @@ Note: a lot of vibe-coding was used to write this code.
 
 - 🎨 **Text-to-LUT**: Generate LUTs from natural language prompts using CLIP or Gemma 3
 - 🤖 **Multiple Models**: Choose from CLIP or Gemma 3 (4B, 12B, 27B) for different quality/speed tradeoffs
-- 🔍 **Comparison Mode**: VLM comparison mode for context-aware transformations
+- 🔍 **Context-Aware VLM**: Gemma 3 models evaluate transformations by comparing before/after images
 - 🔧 **Export format**: Exports standard .cube files compatible with most photo/video software
 - ⚡ **GPU & CPU support**: Works with CUDA, MPS (Apple Silicon), or CPU
 
@@ -71,11 +71,11 @@ python main.py optimize [OPTIONS]
 
 **Key Options:**
 - `--model-type`: Model to use (default: "clip")
-  - `clip`: CLIP ViT-L/14 (fast, good quality)
-  - `gemma3_4b`: Gemma 3 4B (fastest VLM, good quality)
+  - `clip`: CLIP ViT-L/14 (fast, good quality, evaluates final image only)
+  - `gemma3_4b`: Gemma 3 4B (fastest VLM, context-aware transformations)
   - `gemma3_12b`: Gemma 3 12B (balanced, recommended for VLM)
   - `gemma3_27b`: Gemma 3 27B (highest quality, slowest)
-- `--vlm-comparison-mode`: Enable comparison mode for VLM models (compares before/after transformation)
+  - Note: Gemma models compare original vs transformed images for better results
 - `--lut-size INT`: LUT resolution (default: 16). Higher = more detailed, but more prone to banding artifacts
 - `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
@@ -109,13 +109,12 @@ python main.py optimize \
   --verbose
 ```
 
-VLM with comparison mode (context-aware transformations):
+VLM with context-aware transformations:
 ```bash
 python main.py optimize \
   --prompt "warm golden hour" \
   --image-folder images_resized/ \
   --model-type gemma3_12b \
-  --vlm-comparison-mode \
   --lut-size 32 \
   --steps 1000 \
   --batch-size 2 \
@@ -188,7 +187,7 @@ Higher resolution or long training of LUTs might lead to banding artifacts. To c
 * Other representations besides LUTs
 * Large-scale LUT library generation
 
-For more details on VLM comparison mode, see [COMPARISON_MODE_USAGE.md](COMPARISON_MODE_USAGE.md).
+For more details on Gemma 3 context-aware evaluation, see [COMPARISON_MODE_USAGE.md](COMPARISON_MODE_USAGE.md).
 
 ## License
 

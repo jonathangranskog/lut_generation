@@ -1,18 +1,14 @@
-# VLM Comparison Mode Usage Guide
+# Gemma 3 Context-Aware Color Grading
 
 ## Overview
 
-The VLM loss now supports two modes:
+All Gemma 3 models (gemma3_4b, gemma3_12b, gemma3_27b) use a **context-aware comparison approach** that evaluates transformations by comparing original and transformed images, rather than just assessing the final result.
 
-1. **Assessment Mode** (default): Evaluates if a single image has the desired color grade
-   - Question: "Does this image have the color grade or look of '{prompt}'?"
+The VLM is asked: *"Looking at these two images, has the '{prompt}' color grade been successfully applied to transform the first image into the second?"*
 
-2. **Comparison Mode** (new): Evaluates if the transformation from original to transformed image correctly applies the color grade
-   - Question: "Looking at these two images, has the '{prompt}' color grade been successfully applied to transform the first image into the second?"
+## Why This Approach Works Better
 
-## Why Use Comparison Mode?
-
-Comparison mode provides **better contextual understanding** by:
+Context-aware evaluation provides **better gradient signals** by:
 
 - **Relative assessment**: Judges the transformation relative to the starting point, not just the final result
 - **Prevents over-transformation**: Can identify when a transformation is too aggressive or not appropriate for the input
@@ -23,14 +19,13 @@ Comparison mode provides **better contextual understanding** by:
 
 ### Basic Usage
 
-To enable comparison mode, add the `--vlm-comparison-mode` flag when using a Gemma 3 model:
+Simply select a Gemma 3 model type to automatically use context-aware evaluation:
 
 ```bash
 python main.py optimize \
   --prompt "warm golden hour" \
   --image-folder ./images \
-  --model-type gemma3_12b \
-  --vlm-comparison-mode
+  --model-type gemma3_12b
 ```
 
 ### Full Example with All Options
@@ -40,7 +35,6 @@ python main.py optimize \
   --prompt "cinematic teal and orange" \
   --image-folder ./dataset \
   --model-type gemma3_12b \
-  --vlm-comparison-mode \
   --steps 1000 \
   --batch-size 4 \
   --learning-rate 0.005 \
@@ -52,61 +46,41 @@ python main.py optimize \
   --output-path cinematic_lut.cube
 ```
 
-**Model Options:**
-- `gemma3_4b`: Gemma 3 4B (fastest, less capable)
+### Model Options
+
+- `gemma3_4b`: Gemma 3 4B (fastest, good quality)
 - `gemma3_12b`: Gemma 3 12B (balanced - recommended)
 - `gemma3_27b`: Gemma 3 27B (most capable, slowest)
-- `clip`: CLIP ViT-L/14 (fast, but comparison mode not supported)
 
-### Comparison: Assessment vs Comparison Mode
+All Gemma models use context-aware evaluation by default.
 
-#### Assessment Mode (default)
-```bash
-# Asks: "Does this image have the color grade or look of 'warm golden hour'?"
-python main.py optimize \
-  --prompt "warm golden hour" \
-  --image-folder ./images \
-  --model-type gemma3_12b
-```
+### When to Use Gemma 3 vs CLIP
 
-**Best for:**
-- When all input images are similar in style
-- When you want the absolute best match to the prompt regardless of input
-- Simpler cases where transformation magnitude doesn't matter
-
-#### Comparison Mode (new)
-```bash
-# Asks: "Has the 'warm golden hour' color grade been successfully applied?"
-python main.py optimize \
-  --prompt "warm golden hour" \
-  --image-folder ./images \
-  --model-type gemma3_12b \
-  --vlm-comparison-mode
-```
-
-**Best for:**
-- Diverse input images (different lighting, colors, styles)
-- When you want appropriate transformation relative to input
-- Preventing excessive color shifts
+**Gemma 3 Models (Context-Aware):**
+- Diverse input images with different lighting, colors, styles
+- Want appropriate transformations relative to input
+- Prevent excessive color shifts
 - More natural-looking results that preserve input characteristics
+- Better handling of edge cases (e.g., images already close to target)
+
+**CLIP (Single Image Assessment):**
+- All input images are similar in style
+- Want the absolute best match to the prompt
+- Faster inference (no need to process two images)
+- Simpler transformations
 
 ## Technical Details
 
 ### How It Works
 
-**Assessment Mode:**
-- VLM sees: `[transformed_image]`
-- Evaluates: "Does this look like {prompt}?"
-- Optimizes: Make the output match the prompt
-
-**Comparison Mode:**
+Gemma 3 models use context-aware evaluation:
 - VLM sees: `[original_image, transformed_image]`
-- Evaluates: "Was the transformation correct?"
+- Evaluates: "Was the color grade successfully applied?"
 - Optimizes: Make the transformation appropriate for the input
 
 ### Memory Considerations
 
-Comparison mode processes **2 images per example** instead of 1, which:
+Gemma 3 processes **2 images per example** (original + transformed), which:
 - Uses approximately **2x GPU memory**
 - Takes slightly longer per iteration
 
@@ -116,13 +90,14 @@ If you encounter memory issues:
 
 ### Gradient Flow
 
-Both modes maintain full differentiability through the LUT transformation, allowing:
+Full differentiability is maintained through the LUT transformation:
 - Gradients flow from VLM → transformed image → LUT parameters
-- In comparison mode, gradients flow through the transformed image only (original is constant)
+- Original images are constant (no gradients flow through them)
+- Only the LUT parameters are optimized
 
-## Example Results
+## Expected Results
 
-When using comparison mode, you should observe:
+When using Gemma 3 models, you should observe:
 
 1. **More conservative transformations** - The VLM considers whether the change is appropriate
 2. **Better preservation of input characteristics** - Natural lighting and composition maintained
@@ -131,24 +106,20 @@ When using comparison mode, you should observe:
 
 ## Troubleshooting
 
-### "original_images must be provided" Error
-- This error occurs if comparison_mode is enabled but original images aren't passed
-- This is automatically handled in main.py - if you see this, there may be a bug
-
 ### High Memory Usage
 - Reduce `--batch-size` to 2 or 1
+- Gemma 3 models require more VRAM due to processing two images
 - Ensure you're using GPU (CUDA) if available
 
-### Comparison Mode Ignored Warning
-- You'll see this if you use `--vlm-comparison-mode` with `--model-type clip`
-- Comparison mode only works with VLM, not CLIP
+### Slow Training
+- Use smaller model: `gemma3_4b` instead of `gemma3_12b` or `gemma3_27b`
+- Reduce batch size
+- Gemma 3 is slower than CLIP but produces better context-aware results
 
 ## Implementation Notes
 
-The comparison mode is implemented by:
-1. Modifying `VLMLoss` class to accept a `comparison_mode` parameter
-2. Using two image tokens in the prompt when in comparison mode
-3. Processing original and transformed images together
-4. Automatically detecting comparison mode in `compute_losses()` and passing both images
-
-The implementation maintains backward compatibility - existing code continues to work with default assessment mode.
+Context-aware evaluation is implemented by:
+1. VLMLoss always uses two image tokens in the prompt
+2. Processing original and transformed images together as pairs
+3. Automatically detecting VLM models in `compute_losses()` and passing both images
+4. CLIP models continue to work with single-image assessment
