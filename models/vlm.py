@@ -128,7 +128,9 @@ class VLMLoss(nn.Module):
         )
 
         # Create blank images for tokenization (will be replaced during forward)
-        blank_images = [Image.new("RGB", self.image_size, color="white") for _ in range(num_images)]
+        blank_images = [
+            Image.new("RGB", self.image_size, color="white") for _ in range(num_images)
+        ]
 
         # Tokenize the prompt
         inputs = self.processor(
@@ -178,7 +180,9 @@ class VLMLoss(nn.Module):
 
         return normalized
 
-    def forward(self, images: torch.Tensor, original_images: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, images: torch.Tensor, original_images: torch.Tensor
+    ) -> torch.Tensor:
         """
         Compute contrastive VLM loss between original and transformed images.
 
@@ -202,7 +206,9 @@ class VLMLoss(nn.Module):
 
         # Interleave original and transformed images for the batch
         # Shape: (B*2, C, H, W) where pairs are [orig_0, trans_0, orig_1, trans_1, ...]
-        pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
+        pixel_values = torch.stack(
+            [original_pixel_values, transformed_pixel_values], dim=1
+        )
         pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
 
         # Expand input_ids for batch (each pair shares the same prompt)
@@ -231,7 +237,9 @@ class VLMLoss(nn.Module):
 
         return loss
 
-    def compute_probability(self, images: torch.Tensor, original_images: torch.Tensor) -> torch.Tensor:
+    def compute_probability(
+        self, images: torch.Tensor, original_images: torch.Tensor
+    ) -> torch.Tensor:
         """
         Compute probability of Yes answer (higher is better).
 
@@ -245,9 +253,13 @@ class VLMLoss(nn.Module):
         batch_size = images.shape[0]
 
         with torch.no_grad():
-            original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
+            original_pixel_values = self.preprocess_images(original_images).to(
+                self.dtype
+            )
             transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
-            pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
+            pixel_values = torch.stack(
+                [original_pixel_values, transformed_pixel_values], dim=1
+            )
             pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
             input_ids = self.input_ids.expand(batch_size, -1)
 
@@ -278,9 +290,13 @@ class VLMLoss(nn.Module):
         batch_size = images.shape[0]
 
         with torch.no_grad():
-            original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
+            original_pixel_values = self.preprocess_images(original_images).to(
+                self.dtype
+            )
             transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
-            pixel_values = torch.stack([original_pixel_values, transformed_pixel_values], dim=1)
+            pixel_values = torch.stack(
+                [original_pixel_values, transformed_pixel_values], dim=1
+            )
             pixel_values = pixel_values.view(batch_size * 2, *pixel_values.shape[2:])
             input_ids = self.input_ids.expand(batch_size, -1)
 
@@ -296,7 +312,9 @@ class VLMLoss(nn.Module):
 
         return p_yes, p_no
 
-    def get_prediction(self, images: torch.Tensor, original_images: torch.Tensor) -> list[str]:
+    def get_prediction(
+        self, images: torch.Tensor, original_images: torch.Tensor
+    ) -> list[str]:
         """
         Get the model's actual predicted answer for debugging.
 

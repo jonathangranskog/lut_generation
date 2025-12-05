@@ -100,7 +100,9 @@ class CLIPLoss(nn.Module):
 
         return normalized
 
-    def forward(self, images: torch.Tensor, original_images: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self, images: torch.Tensor, original_images: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """
         Compute CLIP cosine similarity loss between images and text prompt.
 

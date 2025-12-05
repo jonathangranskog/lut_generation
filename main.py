@@ -156,7 +156,10 @@ def save_training_checkpoint(
 def optimize(
     prompt: Annotated[str, typer.Option(help="The prompt to optimize the LUT for.")],
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
-    model_type: Annotated[ModelType, typer.Option(help="Model type: clip, gemma3_4b, gemma3_12b, or gemma3_27b")] = "clip",
+    model_type: Annotated[
+        ModelType,
+        typer.Option(help="Model type: clip, gemma3_4b, gemma3_12b, or gemma3_27b"),
+    ] = "clip",
     lut_size: int = 16,
     steps: int = 500,
     batch_size: int = 4,

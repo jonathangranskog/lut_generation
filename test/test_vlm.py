@@ -29,7 +29,9 @@ def test_vlm_loss():
     # Create dummy original and transformed images with gradient tracking
     batch_size = 2
     original_images = torch.rand(batch_size, 3, 512, 512, device=device)
-    transformed_images = torch.rand(batch_size, 3, 512, 512, device=device, requires_grad=True)
+    transformed_images = torch.rand(
+        batch_size, 3, 512, 512, device=device, requires_grad=True
+    )
 
     # Compute loss
     print("Computing loss...")
