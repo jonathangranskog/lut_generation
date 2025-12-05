@@ -71,11 +71,11 @@ python main.py optimize [OPTIONS]
 
 **Key Options:**
 - `--model-type`: Model to use (default: "clip")
-  - `clip`: CLIP ViT-L/14 (fast, good quality, evaluates final image only)
+  - `clip`: CLIP ViT-L/14 (RECOMMENDED: fast, great quality, evaluates final image only)
   - `gemma3_4b`: Gemma 3 4B (fastest VLM, context-aware transformations)
   - `gemma3_12b`: Gemma 3 12B (balanced, recommended for VLM)
   - `gemma3_27b`: Gemma 3 27B (highest quality, slowest)
-  - Note: Gemma models compare original vs transformed images for better results
+  - Note: Gemma models compare original vs transformed images. They work best for precise minute LUTs.
 - `--lut-size INT`: LUT resolution (default: 16). Higher = more detailed, but more prone to banding artifacts
 - `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
