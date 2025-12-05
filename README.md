@@ -81,6 +81,7 @@ python main.py optimize [OPTIONS]
 - `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
 - `--grayscale`: Optimize a black-and-white LUT (single channel) that outputs same intensity for RGB (default: False)
+- `--image-text-weight FLOAT`: Weight of the text prompt loss
 - `--image-smoothness FLOAT`: Image-space anti-banding strength (default: 1.0)
 - `--image-regularization FLOAT`: Keep changes subtle (default: 1.0)
 - `--black-preservation FLOAT`: Retain black values to reduce fading (default: 1.0)
@@ -121,7 +122,8 @@ python main.py optimize \
   --prompt "kodak portra 400 film" \
   --image-folder images/ \
   --model-type sds \
-  --output-path portra.cube
+  --output-path portra.cube \
+  --image-text-weight 10.0
 ```
 
 Black-and-white LUT with grayscale optimization:
