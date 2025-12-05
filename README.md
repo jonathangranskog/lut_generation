@@ -1,12 +1,14 @@
 # LUT Generation (🚧 WIP 🚧)
 
-Generate custom 3D LUTs (Look-Up Tables) for color grading using CLIP-guided optimization. Transform your images to match any text prompt (e.g., "golden hour", "cinematic teal and orange", "vintage film").
+Generate custom 3D LUTs (Look-Up Tables) for color grading using AI-guided optimization. Transform your images to match any text prompt (e.g., "golden hour", "cinematic teal and orange", "vintage film").
 
-Note: a lot of vibe-coding was used to write this code. 
+Note: a lot of vibe-coding was used to write this code.
 
 ## Features
 
-- 🎨 **Text-to-LUT**: Generate LUTs from natural language prompts using CLIP
+- 🎨 **Text-to-LUT**: Generate LUTs from natural language prompts using CLIP or Gemma 3
+- 🤖 **Multiple Models**: Choose from CLIP or Gemma 3 (4B, 12B, 27B) for different quality/speed tradeoffs
+- 🔍 **Comparison Mode**: VLM comparison mode for context-aware transformations
 - 🔧 **Export format**: Exports standard .cube files compatible with most photo/video software
 - ⚡ **GPU & CPU support**: Works with CUDA, MPS (Apple Silicon), or CPU
 
@@ -68,6 +70,12 @@ python main.py optimize [OPTIONS]
 - `--image-folder PATH`: Folder containing training images
 
 **Key Options:**
+- `--model-type`: Model to use (default: "clip")
+  - `clip`: CLIP ViT-L/14 (fast, good quality)
+  - `gemma3_4b`: Gemma 3 4B (fastest VLM, good quality)
+  - `gemma3_12b`: Gemma 3 12B (balanced, recommended for VLM)
+  - `gemma3_27b`: Gemma 3 27B (highest quality, slowest)
+- `--vlm-comparison-mode`: Enable comparison mode for VLM models (compares before/after transformation)
 - `--lut-size INT`: LUT resolution (default: 16). Higher = more detailed, but more prone to banding artifacts
 - `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
@@ -84,11 +92,12 @@ python main.py optimize [OPTIONS]
 
 **Examples:**
 
-Standard color LUT:
+Standard color LUT with CLIP:
 ```bash
 python main.py optimize \
   --prompt "cinematic teal and orange" \
   --image-folder images_resized/ \
+  --model-type clip \
   --lut-size 32 \
   --steps 500 \
   --learning-rate 0.005 \
@@ -98,6 +107,19 @@ python main.py optimize \
   --test-image photo1.jpg \
   --test-image photo2.jpg \
   --verbose
+```
+
+VLM with comparison mode (context-aware transformations):
+```bash
+python main.py optimize \
+  --prompt "warm golden hour" \
+  --image-folder images_resized/ \
+  --model-type gemma3_12b \
+  --vlm-comparison-mode \
+  --lut-size 32 \
+  --steps 1000 \
+  --batch-size 2 \
+  --output-path golden_hour.cube
 ```
 
 Black-and-white LUT with grayscale optimization:
@@ -161,10 +183,12 @@ Higher resolution or long training of LUTs might lead to banding artifacts. To c
 
 # Future Improvements
 
-* Support VLM-based optimization (similar to our paper [Dual-Process Image Generation](https://dual-process.github.io/)) or SDS optimization (like in [DreamFusion](https://dreamfusion3d.github.io/))
+* SDS optimization (like in [DreamFusion](https://dreamfusion3d.github.io/))
 * Better regularization so more complex LUTs can be generated
 * Other representations besides LUTs
 * Large-scale LUT library generation
+
+For more details on VLM comparison mode, see [COMPARISON_MODE_USAGE.md](COMPARISON_MODE_USAGE.md).
 
 ## License
 

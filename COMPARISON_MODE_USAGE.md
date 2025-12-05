@@ -23,13 +23,13 @@ Comparison mode provides **better contextual understanding** by:
 
 ### Basic Usage
 
-To enable comparison mode, add the `--vlm-comparison-mode` flag when using VLM:
+To enable comparison mode, add the `--vlm-comparison-mode` flag when using a Gemma 3 model:
 
 ```bash
 python main.py optimize \
   --prompt "warm golden hour" \
   --image-folder ./images \
-  --model-type vlm \
+  --model-type gemma3_12b \
   --vlm-comparison-mode
 ```
 
@@ -39,7 +39,7 @@ python main.py optimize \
 python main.py optimize \
   --prompt "cinematic teal and orange" \
   --image-folder ./dataset \
-  --model-type vlm \
+  --model-type gemma3_12b \
   --vlm-comparison-mode \
   --steps 1000 \
   --batch-size 4 \
@@ -52,6 +52,12 @@ python main.py optimize \
   --output-path cinematic_lut.cube
 ```
 
+**Model Options:**
+- `gemma3_4b`: Gemma 3 4B (fastest, less capable)
+- `gemma3_12b`: Gemma 3 12B (balanced - recommended)
+- `gemma3_27b`: Gemma 3 27B (most capable, slowest)
+- `clip`: CLIP ViT-L/14 (fast, but comparison mode not supported)
+
 ### Comparison: Assessment vs Comparison Mode
 
 #### Assessment Mode (default)
@@ -60,7 +66,7 @@ python main.py optimize \
 python main.py optimize \
   --prompt "warm golden hour" \
   --image-folder ./images \
-  --model-type vlm
+  --model-type gemma3_12b
 ```
 
 **Best for:**
@@ -74,7 +80,7 @@ python main.py optimize \
 python main.py optimize \
   --prompt "warm golden hour" \
   --image-folder ./images \
-  --model-type vlm \
+  --model-type gemma3_12b \
   --vlm-comparison-mode
 ```
 

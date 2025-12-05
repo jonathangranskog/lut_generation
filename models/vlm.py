@@ -22,6 +22,13 @@ GEMMA_TEMPLATE = (
     "<start_of_turn>model\n"
 )
 
+# Model type to HuggingFace model name mapping
+MODEL_NAME_MAP = {
+    "gemma3_4b": "google/gemma-3-4b-it",
+    "gemma3_12b": "google/gemma-3-12b-it",
+    "gemma3_27b": "google/gemma-3-27b-it",
+}
+
 
 class VLMLoss(nn.Module):
     """
@@ -38,7 +45,7 @@ class VLMLoss(nn.Module):
     def __init__(
         self,
         prompt: str,
-        model_name: str = "google/gemma-3-12b-it",
+        model_name: str = "gemma3_12b",
         device: str = "cuda",
         dtype: torch.dtype | None = None,
         comparison_mode: bool = False,
@@ -49,7 +56,8 @@ class VLMLoss(nn.Module):
 
         Args:
             prompt: Text prompt describing desired image style (e.g., "warm golden hour")
-            model_name: HuggingFace model identifier for Gemma 3
+            model_name: Model identifier - either a model type key (gemma3_4b, gemma3_12b, gemma3_27b)
+                       or a full HuggingFace model identifier (e.g., "google/gemma-3-12b-it")
             device: Device to run the model on
             dtype: Model dtype (None = auto-select: bfloat16 for CUDA, float32 for CPU)
             comparison_mode: If True, compare original vs transformed images. If False, assess single image.
@@ -75,16 +83,22 @@ class VLMLoss(nn.Module):
 
         self.question = question_template.format(prompt=prompt)
 
-        # Load VLM model and processor
-        print(f"Loading VLM model: {model_name}")
+        # Map model type to HuggingFace identifier if needed
+        if model_name in MODEL_NAME_MAP:
+            hf_model_name = MODEL_NAME_MAP[model_name]
+            print(f"Loading VLM model: {model_name} ({hf_model_name})")
+        else:
+            hf_model_name = model_name
+            print(f"Loading VLM model: {hf_model_name}")
+
         if device == "cpu":
             print("  Warning: Running VLM on CPU will be very slow (~minutes per step)")
         self.model = Gemma3ForConditionalGeneration.from_pretrained(
-            model_name,
+            hf_model_name,
             device_map=device,
             dtype=self.dtype,
         )
-        self.processor = AutoProcessor.from_pretrained(model_name)
+        self.processor = AutoProcessor.from_pretrained(hf_model_name)
 
         # Disable image splitting for simpler processing
         if hasattr(self.processor.image_processor, "do_image_splitting"):
