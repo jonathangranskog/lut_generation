@@ -22,9 +22,11 @@ from tqdm import tqdm
 from typing_extensions import Annotated
 
 from models.clip import CLIPLoss
+from models.sds import SDSLoss
 from models.vlm import VLMLoss
 from utils import (
     CLIP_IMAGE_SIZE,
+    DEEPFLOYD_IMAGE_SIZE,
     VLM_IMAGE_SIZE,
     ImageDataset,
     apply_lut,
@@ -39,7 +41,7 @@ from utils import (
     write_cube_file,
 )
 
-ModelType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b"]
+ModelType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", "sds"]
 
 app = typer.Typer()
 
@@ -158,7 +160,9 @@ def optimize(
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
     model_type: Annotated[
         ModelType,
-        typer.Option(help="Model type: clip, gemma3_4b, gemma3_12b, or gemma3_27b"),
+        typer.Option(
+            help="Model type: clip, gemma3_4b, gemma3_12b, gemma3_27b, or sds"
+        ),
     ] = "clip",
     lut_size: int = 16,
     steps: int = 500,
@@ -193,7 +197,13 @@ def optimize(
     print(f"Using device: {device}")
 
     # Select image size based on model type
-    image_size = CLIP_IMAGE_SIZE if model_type == "clip" else VLM_IMAGE_SIZE
+    if model_type == "clip":
+        image_size = CLIP_IMAGE_SIZE
+    elif model_type == "sds":
+        image_size = DEEPFLOYD_IMAGE_SIZE
+    else:
+        # Gemma 3 models use VLM image size
+        image_size = VLM_IMAGE_SIZE
 
     # Create dataset
     dataset = ImageDataset(image_folder, image_size=image_size)
@@ -215,9 +225,10 @@ def optimize(
     if model_type == "clip":
         loss_fn = CLIPLoss(prompt, device=device)
     elif model_type in ["gemma3_4b", "gemma3_12b", "gemma3_27b"]:
-        # All other model types are VLM models (gemma3_4b, gemma3_12b, gemma3_27b)
         # VLM models use comparison mode to evaluate transformations
         loss_fn = VLMLoss(prompt, model_name=model_type, device=device)
+    elif model_type == "sds":
+        loss_fn = SDSLoss(prompt, device=device)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
