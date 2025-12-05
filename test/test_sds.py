@@ -51,7 +51,7 @@ def test_sds_preprocess_images():
     test_cases = [
         (1, 3, 256, 256),  # Typical dataset crop size
         (2, 3, 512, 512),
-        (4, 3, 64, 64),   # Already at UNet size
+        (4, 3, 64, 64),  # Already at UNet size
         (1, 3, 128, 128),
     ]
 
@@ -60,7 +60,12 @@ def test_sds_preprocess_images():
         processed = preprocess_images(images)
 
         # Check output shape is UNet size (64x64)
-        assert processed.shape == (shape[0], 3, DEEPFLOYD_UNET_SIZE, DEEPFLOYD_UNET_SIZE)
+        assert processed.shape == (
+            shape[0],
+            3,
+            DEEPFLOYD_UNET_SIZE,
+            DEEPFLOYD_UNET_SIZE,
+        )
 
         # Check output range is [-1, 1]
         assert processed.min() >= -1.0
@@ -133,7 +138,9 @@ def test_sds_cfg_logic():
     guidance_scale = 20.0
 
     # Apply CFG
-    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
+    noise_pred = noise_pred_uncond + guidance_scale * (
+        noise_pred_cond - noise_pred_uncond
+    )
 
     # Verify shape preserved
     assert noise_pred.shape == noise_pred_uncond.shape

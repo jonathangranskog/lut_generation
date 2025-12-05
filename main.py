@@ -160,7 +160,9 @@ def optimize(
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
     model_type: Annotated[
         ModelType,
-        typer.Option(help="Model type: clip, gemma3_4b, gemma3_12b, gemma3_27b, or sds"),
+        typer.Option(
+            help="Model type: clip, gemma3_4b, gemma3_12b, gemma3_27b, or sds"
+        ),
     ] = "clip",
     lut_size: int = 16,
     steps: int = 500,

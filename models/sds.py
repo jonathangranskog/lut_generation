@@ -75,7 +75,9 @@ class SDSLoss(nn.Module):
             model_name = "DeepFloyd/IF-I-M-v1.0"
 
         print(f"Loading DeepFloyd IF model: {model_name}")
-        print(f"  This requires accepting the license at: https://huggingface.co/{model_name}")
+        print(
+            f"  This requires accepting the license at: https://huggingface.co/{model_name}"
+        )
         print(f"  Device: {device}, dtype: {self.dtype}")
 
         # Load the IF pipeline
