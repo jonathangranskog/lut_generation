@@ -41,7 +41,7 @@ from utils import (
     write_cube_file,
 )
 
-ModelType = Literal["clip", "vlm", "sds"]
+ModelType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", "sds"]
 
 app = typer.Typer()
 
@@ -78,13 +78,14 @@ def format_loss_log(
     step: int,
     total_loss: torch.Tensor,
     loss_components: dict,
+    image_text_weight: float,
     image_smoothness: float,
     image_regularization: float,
     black_preservation: float,
     lut_smoothness: float,
 ) -> str:
     """Format a detailed loss log message."""
-    log_msg = f"Step {step}: Loss = {total_loss.item():.4f} (Primary: {loss_components['primary'].item():.4f}"
+    log_msg = f"Step {step}: Loss = {total_loss.item():.4f} (Primary: {(image_text_weight * loss_components['primary']).item():.4f}"
 
     if image_smoothness > 0 and "img_smooth" in loss_components:
         log_msg += (
@@ -157,11 +158,15 @@ def save_training_checkpoint(
 def optimize(
     prompt: Annotated[str, typer.Option(help="The prompt to optimize the LUT for.")],
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
-    model_type: Annotated[ModelType, typer.Option(help="Model type: clip, vlm, or sds")] = "clip",
+    model_type: Annotated[
+        ModelType,
+        typer.Option(help="Model type: clip, gemma3_4b, gemma3_12b, gemma3_27b, or sds"),
+    ] = "clip",
     lut_size: int = 16,
     steps: int = 500,
     batch_size: int = 4,
     learning_rate: float = 5e-3,
+    image_text_weight: float = 1.0,
     image_smoothness: float = 1.0,
     image_regularization: float = 1.0,
     black_preservation: float = 1.0,
@@ -179,11 +184,15 @@ def optimize(
     """
     Optimize a LUT given a small dataset of images and a prompt.
 
+    Image text weight controls the contribution of the main image-text alignment loss (CLIP or Gemma 3).
     Image smoothness penalizes banding and discontinuities in output images.
     Image regularization keeps output images close to input images (subtle changes).
     Black preservation prevents faded/lifted blacks (maintains deep shadows).
     Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
     Grayscale optimizes a black-and-white LUT (single channel) that outputs same intensity for RGB.
+
+    Note: Gemma 3 models use comparison mode by default, evaluating transformations by comparing
+    original and transformed images for more context-aware color grading.
 
     SDS-specific options (only used when model_type='sds'):
     - sds_guidance_scale: Classifier-free guidance scale (default 20.0)
@@ -195,12 +204,13 @@ def optimize(
     print(f"Using device: {device}")
 
     # Select image size based on model type
-    if model_type == "vlm":
-        image_size = VLM_IMAGE_SIZE
+    if model_type == "clip":
+        image_size = CLIP_IMAGE_SIZE
     elif model_type == "sds":
         image_size = DEEPFLOYD_IMAGE_SIZE
     else:
-        image_size = CLIP_IMAGE_SIZE
+        # Gemma 3 models use VLM image size
+        image_size = VLM_IMAGE_SIZE
 
     # Create dataset
     dataset = ImageDataset(image_folder, image_size=image_size)
@@ -221,8 +231,9 @@ def optimize(
     # Create loss function
     if model_type == "clip":
         loss_fn = CLIPLoss(prompt, device=device)
-    elif model_type == "vlm":
-        loss_fn = VLMLoss(prompt, device=device)
+    elif model_type in ["gemma3_4b", "gemma3_12b", "gemma3_27b"]:
+        # VLM models use comparison mode to evaluate transformations
+        loss_fn = VLMLoss(prompt, model_name=model_type, device=device)
     elif model_type == "sds":
         loss_fn = SDSLoss(
             prompt,
@@ -273,6 +284,7 @@ def optimize(
                 transformed_images,
                 images,
                 lut_tensor,
+                image_text_weight,
                 image_smoothness,
                 image_regularization,
                 black_preservation,
@@ -313,6 +325,7 @@ def optimize(
                     step,
                     loss,
                     loss_components,
+                    image_text_weight,
                     image_smoothness,
                     image_regularization,
                     black_preservation,

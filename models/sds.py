@@ -153,7 +153,9 @@ class SDSLoss(nn.Module):
 
         return images.to(self.dtype)
 
-    def forward(self, images: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, images: torch.Tensor, original_images: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """
         Compute SDS loss for a batch of images.
 
@@ -165,6 +167,7 @@ class SDSLoss(nn.Module):
 
         Args:
             images: Batch of images in [0, 1] range, shape (B, C, H, W)
+            original_images: Unused (for compatibility with VLMLoss signature)
 
         Returns:
             Scalar loss value
