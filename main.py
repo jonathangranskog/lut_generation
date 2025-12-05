@@ -39,7 +39,7 @@ from utils import (
     write_cube_file,
 )
 
-ModelType = Literal["clip", "vlm"]
+ModelType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b"]
 
 app = typer.Typer()
 
@@ -156,7 +156,10 @@ def save_training_checkpoint(
 def optimize(
     prompt: Annotated[str, typer.Option(help="The prompt to optimize the LUT for.")],
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
-    model_type: Annotated[ModelType, typer.Option(help="Model (clip)")] = "clip",
+    model_type: Annotated[
+        ModelType,
+        typer.Option(help="Model type: clip, gemma3_4b, gemma3_12b, or gemma3_27b"),
+    ] = "clip",
     lut_size: int = 16,
     steps: int = 500,
     batch_size: int = 4,
@@ -175,19 +178,22 @@ def optimize(
     """
     Optimize a LUT given a small dataset of images and a prompt.
 
-    Image text weight controls the contribution of the main image-text alignment loss (CLIP or VLM).
+    Image text weight controls the contribution of the main image-text alignment loss (CLIP or Gemma 3).
     Image smoothness penalizes banding and discontinuities in output images.
     Image regularization keeps output images close to input images (subtle changes).
     Black preservation prevents faded/lifted blacks (maintains deep shadows).
     Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
     Grayscale optimizes a black-and-white LUT (single channel) that outputs same intensity for RGB.
+
+    Note: Gemma 3 models use comparison mode by default, evaluating transformations by comparing
+    original and transformed images for more context-aware color grading.
     """
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
     print(f"Using device: {device}")
 
     # Select image size based on model type
-    image_size = VLM_IMAGE_SIZE if model_type == "vlm" else CLIP_IMAGE_SIZE
+    image_size = CLIP_IMAGE_SIZE if model_type == "clip" else VLM_IMAGE_SIZE
 
     # Create dataset
     dataset = ImageDataset(image_folder, image_size=image_size)
@@ -208,8 +214,10 @@ def optimize(
     # Create loss function
     if model_type == "clip":
         loss_fn = CLIPLoss(prompt, device=device)
-    elif model_type == "vlm":
-        loss_fn = VLMLoss(prompt, device=device)
+    elif model_type in ["gemma3_4b", "gemma3_12b", "gemma3_27b"]:
+        # All other model types are VLM models (gemma3_4b, gemma3_12b, gemma3_27b)
+        # VLM models use comparison mode to evaluate transformations
+        loss_fn = VLMLoss(prompt, model_name=model_type, device=device)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 

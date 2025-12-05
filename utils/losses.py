@@ -70,7 +70,9 @@ def compute_losses(
     black_preservation: float,
     lut_smoothness: float,
 ) -> tuple[torch.Tensor, dict]:
-    primary_loss = loss_fn(transformed_images)
+    # Both CLIP and VLM loss functions accept (transformed_images, original_images)
+    # CLIP ignores original_images, VLM uses it for context-aware evaluation
+    primary_loss = loss_fn(transformed_images, original_images)
     loss = image_text_weight * primary_loss
     loss_components = {"primary": primary_loss}
 
