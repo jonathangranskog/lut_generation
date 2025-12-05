@@ -6,8 +6,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "accelerate>=1.12.0",
+    "diffusers>=0.35.2",
     "numpy>=2.3.5",
     "pillow>=12.0.0",
+    "sentencepiece>=0.2.1",
     "torch>=2.9.1",
     "torchvision>=0.21.1",
     "transformers>=4.48.3",
