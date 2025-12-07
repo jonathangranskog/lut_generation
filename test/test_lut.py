@@ -1,190 +1,190 @@
-"""
-Tests for LUT loading, saving, and application.
-"""
+"""Tests for LUT loading, saving, and application."""
 
-import os
-import tempfile
+import pytest
 import torch
 
 from utils.io import read_cube_file, write_cube_file
 from utils.transforms import apply_lut, identity_lut
 
 
-def create_gradient_image(width=256, height=256):
-    """
-    Create a synthetic gradient test image with RGB gradients.
-
-    Returns:
-        torch.Tensor: Image tensor of shape (3, H, W) with values in [0, 1]
-    """
-    # Create horizontal gradient for R
-    r = torch.linspace(0, 1, width).unsqueeze(0).expand(height, -1)
-
-    # Create vertical gradient for G
-    g = torch.linspace(0, 1, height).unsqueeze(1).expand(-1, width)
-
-    # Create diagonal gradient for B
-    x = torch.linspace(0, 1, width).unsqueeze(0).expand(height, -1)
-    y = torch.linspace(0, 1, height).unsqueeze(1).expand(-1, width)
-    b = (x + y) / 2.0
-
-    # Stack into (3, H, W) tensor
-    image = torch.stack([r, g, b], dim=0)
-
-    return image
-
-
-def create_red_shifted_lut(resolution=16, red_shift=0.1):
-    """
-    Create a LUT that adds a red shift to images.
-
-    Args:
-        resolution: Size of the LUT cube
-        red_shift: Amount to add to the red channel (default 0.1)
-
-    Returns:
-        torch.Tensor: LUT tensor of shape (resolution, resolution, resolution, 3)
-    """
-    # Start with identity LUT
-    lut = identity_lut(resolution=resolution)
-
-    # Add red shift: increase red channel, clamp to [0, 1]
-    lut[..., 0] = torch.clamp(lut[..., 0] + red_shift, 0, 1)
-
+@pytest.fixture
+def red_shifted_lut():
+    """Create a LUT that adds a red shift to images."""
+    lut = identity_lut(resolution=16)
+    # Add red shift: increase red channel by 0.15, clamp to [0, 1]
+    lut[..., 0] = torch.clamp(lut[..., 0] + 0.15, 0, 1)
     return lut
 
 
-def test_lut_roundtrip():
-    """
-    Test that saving a LUT and loading it again produces the same result
-    when applied to a synthetic gradient image.
-    """
-    # Create synthetic test data
-    image_tensor = create_gradient_image(width=128, height=128)
-    lut_tensor_original = create_red_shifted_lut(resolution=16, red_shift=0.15)
-    domain_min = [0.0, 0.0, 0.0]
-    domain_max = [1.0, 1.0, 1.0]
+class TestLUTIO:
+    """Tests for LUT file I/O operations."""
 
-    # Apply the original LUT
-    result_original = apply_lut(
-        image_tensor, lut_tensor_original, domain_min, domain_max
-    )
-
-    # Save the LUT to a temporary file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".cube", delete=False
-    ) as tmp_file:
-        tmp_lut_path = tmp_file.name
-
-    try:
+    def test_write_and_read_roundtrip(
+        self, red_shifted_lut, temp_cube_file, domain_default
+    ):
+        """Test that saving and loading a LUT preserves its values."""
         # Write the LUT
         write_cube_file(
-            tmp_lut_path,
-            lut_tensor_original,
-            domain_min,
-            domain_max,
+            str(temp_cube_file),
+            red_shifted_lut,
+            domain_default["min"],
+            domain_default["max"],
             title="Red Shifted LUT Test",
         )
 
-        # Load the saved LUT
-        lut_tensor_reloaded, domain_min_reloaded, domain_max_reloaded = read_cube_file(
-            tmp_lut_path
+        # Read it back
+        lut_reloaded, domain_min, domain_max = read_cube_file(str(temp_cube_file))
+
+        # Check domain values
+        assert domain_min == domain_default["min"]
+        assert domain_max == domain_default["max"]
+
+        # Check LUT values (allow small float precision differences)
+        torch.testing.assert_close(
+            red_shifted_lut, lut_reloaded, rtol=1e-5, atol=1e-5
         )
 
-        # Apply the reloaded LUT
-        result_reloaded = apply_lut(
-            image_tensor, lut_tensor_reloaded, domain_min_reloaded, domain_max_reloaded
+    def test_write_with_custom_domain(self, identity_lut_16, temp_cube_file):
+        """Test LUT writing with custom domain values."""
+        custom_min = [0.1, 0.1, 0.1]
+        custom_max = [0.9, 0.9, 0.9]
+
+        write_cube_file(
+            str(temp_cube_file),
+            identity_lut_16,
+            custom_min,
+            custom_max,
+            title="Custom Domain Test",
         )
 
-        # Compare the results
-        # Check that domain values match
-        assert domain_min == domain_min_reloaded, "Domain min values don't match"
-        assert domain_max == domain_max_reloaded, "Domain max values don't match"
+        _, domain_min, domain_max = read_cube_file(str(temp_cube_file))
 
-        # Check that LUT tensors are very close (allow for small floating point differences)
-        lut_diff = torch.abs(lut_tensor_original - lut_tensor_reloaded).max().item()
-        assert lut_diff < 1e-5, f"LUT tensors differ by {lut_diff}"
+        assert domain_min == custom_min
+        assert domain_max == custom_max
 
-        # Check that the applied results are very close
-        result_diff = torch.abs(result_original - result_reloaded).max().item()
-        assert result_diff < 1e-5, f"Applied results differ by {result_diff}"
+    def test_grayscale_lut_writing(self, temp_cube_file):
+        """Test writing a grayscale LUT (single channel)."""
+        # Create a single-channel LUT
+        grayscale_lut = torch.linspace(0, 1, 16**3).reshape(16, 16, 16, 1)
 
-        # Verify that red shift was applied
-        # The result should have more red than the original image
-        red_increase = (result_original[0] - image_tensor[0]).mean().item()
-        assert red_increase > 0, (
-            f"Expected red channel to increase, but it changed by {red_increase}"
+        write_cube_file(
+            str(temp_cube_file),
+            grayscale_lut,
+            title="Grayscale LUT",
+            grayscale=True,
         )
 
-        print("✓ LUT roundtrip test passed!")
-        print(f"  LUT size: {lut_tensor_original.shape}")
-        print(f"  Max LUT difference: {lut_diff:.2e}")
-        print(f"  Max result difference: {result_diff:.2e}")
-        print(f"  Average red channel increase: {red_increase:.4f}")
+        # Read it back
+        lut_reloaded, _, _ = read_cube_file(str(temp_cube_file))
 
-    finally:
-        # Clean up temporary file
-        if os.path.exists(tmp_lut_path):
-            os.remove(tmp_lut_path)
+        # Should be replicated to 3 channels
+        assert lut_reloaded.shape == (16, 16, 16, 3)
+        # All channels should be identical
+        torch.testing.assert_close(lut_reloaded[..., 0], lut_reloaded[..., 1])
+        torch.testing.assert_close(lut_reloaded[..., 1], lut_reloaded[..., 2])
 
 
-def test_synthetic_lut_shape():
-    """Test that synthetic LUT has the correct shape."""
-    lut_tensor = create_red_shifted_lut(resolution=32, red_shift=0.1)
+class TestLUTApplication:
+    """Tests for LUT application to images."""
 
-    # Check that it's 4D
-    assert lut_tensor.ndim == 4, f"Expected 4D tensor, got {lut_tensor.ndim}D"
+    def test_apply_preserves_shape(self, gradient_image, identity_lut_16):
+        """Test that applying a LUT preserves image shape."""
+        result = apply_lut(gradient_image, identity_lut_16)
+        assert result.shape == gradient_image.shape
 
-    # Check that it's cubic
-    assert lut_tensor.shape[0] == lut_tensor.shape[1] == lut_tensor.shape[2], (
-        f"LUT is not cubic: {lut_tensor.shape}"
-    )
+    def test_identity_lut_unchanged(self, gradient_image, identity_lut_16):
+        """Test that identity LUT doesn't change the image."""
+        result = apply_lut(gradient_image, identity_lut_16)
+        torch.testing.assert_close(gradient_image, result, rtol=1e-4, atol=1e-4)
 
-    # Check that it has 3 channels
-    assert lut_tensor.shape[3] == 3, f"Expected 3 channels, got {lut_tensor.shape[3]}"
+    def test_red_shift_increases_red_channel(self, gradient_image, red_shifted_lut):
+        """Test that red-shifted LUT increases red channel values."""
+        result = apply_lut(gradient_image, red_shifted_lut)
 
-    # Check that red channel is shifted
-    identity = identity_lut(resolution=32)
-    red_diff = (lut_tensor[..., 0] - identity[..., 0]).mean().item()
-    assert red_diff > 0, "Red channel should be increased"
+        # Red channel should increase on average
+        red_increase = (result[0] - gradient_image[0]).mean()
+        assert red_increase > 0.1, "Red channel should increase significantly"
 
-    print("✓ Synthetic LUT shape test passed!")
-    print(f"  LUT shape: {lut_tensor.shape}")
-    print(f"  Average red shift: {red_diff:.4f}")
+    def test_batch_processing(self, gradient_image, identity_lut_16):
+        """Test that LUT application works with batched images."""
+        batch = gradient_image.unsqueeze(0).repeat(4, 1, 1, 1)  # (4, 3, H, W)
+        result = apply_lut(batch, identity_lut_16)
 
+        assert result.shape == batch.shape
+        # All images in batch should be processed identically
+        for i in range(1, 4):
+            torch.testing.assert_close(result[0], result[i])
 
-def test_gradient_image_shape():
-    """Test that synthetic gradient image has correct properties."""
-    image = create_gradient_image(width=128, height=128)
+    def test_gradient_flow(self, gradient_image, identity_lut_16):
+        """Test that gradients flow through LUT application."""
+        lut = identity_lut_16.clone()
+        lut.requires_grad = True
 
-    # Check shape
-    assert image.shape == (3, 128, 128), f"Expected (3, 128, 128), got {image.shape}"
+        result = apply_lut(gradient_image, lut)
+        loss = result.sum()
+        loss.backward()
 
-    # Check value range
-    assert image.min() >= 0.0, "Image values should be >= 0"
-    assert image.max() <= 1.0, "Image values should be <= 1"
-
-    # Check that it has actual gradients (not uniform)
-    assert image[0].std() > 0.1, "Red channel should have variation"
-    assert image[1].std() > 0.1, "Green channel should have variation"
-    assert image[2].std() > 0.1, "Blue channel should have variation"
-
-    print("✓ Gradient image test passed!")
-    print(f"  Image shape: {image.shape}")
-    print(f"  Value range: [{image.min():.3f}, {image.max():.3f}]")
-    print(
-        f"  Channel std: R={image[0].std():.3f}, G={image[1].std():.3f}, B={image[2].std():.3f}"
-    )
+        assert lut.grad is not None
+        assert lut.grad.abs().sum() > 0
 
 
-if __name__ == "__main__":
-    # Run tests
-    print("Running LUT tests with synthetic data...\n")
+class TestLUTCreation:
+    """Tests for LUT creation utilities."""
 
-    test_gradient_image_shape()
-    print()
-    test_synthetic_lut_shape()
-    print()
-    test_lut_roundtrip()
+    def test_identity_lut_shape(self):
+        """Test that identity LUT has correct shape."""
+        for size in [8, 16, 32]:
+            lut = identity_lut(resolution=size)
+            assert lut.shape == (size, size, size, 3)
 
-    print("\n✓ All tests passed!")
+    def test_identity_lut_values(self):
+        """Test that identity LUT contains correct values."""
+        lut = identity_lut(resolution=16)
+
+        # Check corners
+        assert torch.allclose(lut[0, 0, 0], torch.tensor([0.0, 0.0, 0.0]))
+        assert torch.allclose(lut[15, 15, 15], torch.tensor([1.0, 1.0, 1.0]))
+
+        # Check value range
+        assert lut.min() >= 0.0
+        assert lut.max() <= 1.0
+
+    def test_grayscale_identity_lut(self):
+        """Test grayscale identity LUT creation."""
+        lut = identity_lut(resolution=16, grayscale=True)
+        assert lut.shape == (16, 16, 16, 1)
+
+        # Should contain luminance values
+        assert lut.min() >= 0.0
+        assert lut.max() <= 1.0
+
+
+class TestEndToEnd:
+    """End-to-end tests combining multiple operations."""
+
+    def test_full_lut_pipeline(
+        self, gradient_image, red_shifted_lut, temp_cube_file, domain_default
+    ):
+        """Test complete pipeline: create LUT -> save -> load -> apply."""
+        # Apply original LUT
+        result_original = apply_lut(
+            gradient_image, red_shifted_lut, domain_default["min"], domain_default["max"]
+        )
+
+        # Save LUT
+        write_cube_file(
+            str(temp_cube_file),
+            red_shifted_lut,
+            domain_default["min"],
+            domain_default["max"],
+            title="Pipeline Test",
+        )
+
+        # Load LUT
+        lut_loaded, domain_min, domain_max = read_cube_file(str(temp_cube_file))
+
+        # Apply loaded LUT
+        result_loaded = apply_lut(gradient_image, lut_loaded, domain_min, domain_max)
+
+        # Results should be nearly identical
+        torch.testing.assert_close(result_original, result_loaded, rtol=1e-5, atol=1e-5)
