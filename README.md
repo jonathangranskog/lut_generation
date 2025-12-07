@@ -65,11 +65,7 @@ python main.py infer \
 pytest -v
 ```
 
-The VLM test is a bit slow if you are on a non-CUDA machine and it requires huggingface credentials. You can ignore it with the below command.
-
-```bash
-pytest -v --ignore=test/test_vlm.py
-```
+It will skip the VLM tests if you are not logged in to huggingface or if CUDA is unavailable. 
 
 ## Commands
 
