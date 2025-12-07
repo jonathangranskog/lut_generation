@@ -59,6 +59,15 @@ python main.py infer \
   --output-path result.jpg
 ```
 
+### 3. Run tests
+
+```bash
+pytest -v
+pytest --ignore=test/test_vlm.py
+```
+
+The VLM test is a bit slow if you are on a non-CUDA machine and it requires huggingface credentials. You can ignore it with the second command.
+
 ## Commands
 
 ### `optimize` - Generate a LUT
