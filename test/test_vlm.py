@@ -9,6 +9,15 @@ import pytest
 import torch
 
 
+def _is_huggingface_logged_in():
+    """Check if user is logged in to HuggingFace."""
+    try:
+        from huggingface_hub import get_token
+        return get_token() is not None
+    except ImportError:
+        return False
+
+
 class TestVLMConstants:
     """Test VLM-related constants."""
 
@@ -178,7 +187,10 @@ class TestVLMContextAware:
         assert hasattr(VLMLoss, 'get_prediction')
 
 
-@pytest.mark.skip(reason="Requires HuggingFace model download and network access")
+@pytest.mark.skipif(
+    not _is_huggingface_logged_in(),
+    reason="Requires HuggingFace login (run: huggingface-cli login)"
+)
 def test_vlm_loss_full_integration():
     """Full integration test with actual VLM model (requires network)."""
     from models.vlm import VLMLoss
@@ -227,7 +239,10 @@ def test_vlm_loss_full_integration():
     not torch.cuda.is_available(),
     reason="CUDA required for VLM model with reasonable performance"
 )
-@pytest.mark.skip(reason="Requires HuggingFace model download")
+@pytest.mark.skipif(
+    not _is_huggingface_logged_in(),
+    reason="Requires HuggingFace login (run: huggingface-cli login)"
+)
 def test_vlm_loss_cuda():
     """Test VLM loss on CUDA device."""
     from models.vlm import VLMLoss
