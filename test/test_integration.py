@@ -1,0 +1,304 @@
+"""Integration tests for complete LUT optimization and inference workflows."""
+
+import subprocess
+from pathlib import Path
+
+import pytest
+import torch
+
+from utils.io import read_cube_file
+from utils.transforms import apply_lut, identity_lut
+
+
+@pytest.mark.integration
+class TestOptimizeWorkflow:
+    """Integration tests for the optimize command."""
+
+    @pytest.mark.slow
+    def test_optimize_clip_basic(self, sample_image_folder, temp_dir):
+        """Test basic CLIP optimization workflow with minimal steps."""
+        output_lut = temp_dir / "test_clip.cube"
+
+        # Run optimize command with minimal steps for speed
+        cmd = [
+            "python",
+            "main.py",
+            "optimize",
+            "--prompt",
+            "warm sunset",
+            "--image-folder",
+            str(sample_image_folder),
+            "--model-type",
+            "clip",
+            "--steps",
+            "5",  # Very few steps for integration test speed
+            "--lut-size",
+            "8",  # Small LUT for speed
+            "--log-interval",
+            "0",  # Disable logging
+            "--output-path",
+            str(output_lut),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        # Check command succeeded
+        assert result.returncode == 0, f"Command failed: {result.stderr}"
+
+        # Check output LUT was created
+        assert output_lut.exists(), "Output LUT file not created"
+
+        # Verify LUT can be loaded
+        lut_tensor, domain_min, domain_max = read_cube_file(str(output_lut))
+        assert lut_tensor.shape == (8, 8, 8, 3)
+        assert lut_tensor.min() >= 0.0
+        assert lut_tensor.max() <= 1.0
+
+    def test_optimize_validates_lut_size(self, sample_image_folder, temp_dir):
+        """Test that optimize rejects invalid LUT sizes."""
+        cmd = [
+            "python",
+            "main.py",
+            "optimize",
+            "--prompt",
+            "test",
+            "--image-folder",
+            str(sample_image_folder),
+            "--lut-size",
+            "7",  # Invalid size
+            "--steps",
+            "1",
+            "--output-path",
+            str(temp_dir / "test.cube"),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        # Should fail with error about LUT size
+        assert result.returncode != 0
+        assert "LUT size must be one of" in result.stderr
+
+    def test_optimize_validates_empty_folder(self, temp_dir):
+        """Test that optimize rejects empty image folders."""
+        empty_folder = temp_dir / "empty"
+        empty_folder.mkdir()
+
+        cmd = [
+            "python",
+            "main.py",
+            "optimize",
+            "--prompt",
+            "test",
+            "--image-folder",
+            str(empty_folder),
+            "--steps",
+            "1",
+            "--output-path",
+            str(temp_dir / "test.cube"),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        # Should fail with error about no images
+        assert result.returncode != 0
+        assert "No valid images found" in result.stderr
+
+    def test_optimize_with_custom_log_dir(self, sample_image_folder, temp_dir):
+        """Test optimize with custom log directory."""
+        output_lut = temp_dir / "test.cube"
+        log_dir = temp_dir / "custom_logs"
+
+        cmd = [
+            "python",
+            "main.py",
+            "optimize",
+            "--prompt",
+            "test",
+            "--image-folder",
+            str(sample_image_folder),
+            "--steps",
+            "5",
+            "--lut-size",
+            "8",
+            "--log-interval",
+            "5",
+            "--log-dir",
+            str(log_dir),
+            "--output-path",
+            str(output_lut),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        assert result.returncode == 0
+        assert log_dir.exists(), "Custom log directory not created"
+        # Check that logs were saved
+        log_files = list(log_dir.glob("*.cube")) + list(log_dir.glob("*.png"))
+        assert len(log_files) > 0, "No log files created"
+
+    def test_optimize_grayscale(self, sample_image_folder, temp_dir):
+        """Test grayscale LUT optimization."""
+        output_lut = temp_dir / "grayscale.cube"
+
+        cmd = [
+            "python",
+            "main.py",
+            "optimize",
+            "--prompt",
+            "black and white",
+            "--image-folder",
+            str(sample_image_folder),
+            "--grayscale",
+            "--steps",
+            "5",
+            "--lut-size",
+            "8",
+            "--log-interval",
+            "0",
+            "--output-path",
+            str(output_lut),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        assert result.returncode == 0
+        assert output_lut.exists()
+
+        # Load and verify it's a valid grayscale LUT
+        lut_tensor, _, _ = read_cube_file(str(output_lut))
+        # After loading, all channels should be identical (grayscale)
+        torch.testing.assert_close(lut_tensor[..., 0], lut_tensor[..., 1])
+        torch.testing.assert_close(lut_tensor[..., 1], lut_tensor[..., 2])
+
+
+@pytest.mark.integration
+class TestInferWorkflow:
+    """Integration tests for the infer command."""
+
+    def test_infer_basic(self, sample_image_folder, temp_dir):
+        """Test basic inference with identity LUT."""
+        # Create an identity LUT
+        lut_file = temp_dir / "identity.cube"
+        from utils.io import write_cube_file
+
+        identity = identity_lut(resolution=16)
+        write_cube_file(str(lut_file), identity, title="Test Identity LUT")
+
+        # Get a test image
+        test_image = next(sample_image_folder.glob("*.jpg"))
+        output_image = temp_dir / "output.png"
+
+        cmd = [
+            "python",
+            "main.py",
+            "infer",
+            str(lut_file),
+            str(test_image),
+            "--output-path",
+            str(output_image),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        assert result.returncode == 0, f"Infer failed: {result.stderr}"
+        assert output_image.exists(), "Output image not created"
+
+    def test_infer_missing_lut_file(self, sample_image_folder, temp_dir):
+        """Test infer with missing LUT file."""
+        test_image = next(sample_image_folder.glob("*.jpg"))
+
+        cmd = [
+            "python",
+            "main.py",
+            "infer",
+            "nonexistent.cube",
+            str(test_image),
+            "--output-path",
+            str(temp_dir / "output.png"),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        # Should fail with file not found error
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower()
+
+    def test_infer_missing_image_file(self, temp_dir):
+        """Test infer with missing image file."""
+        # Create a dummy LUT
+        lut_file = temp_dir / "test.cube"
+        from utils.io import write_cube_file
+
+        write_cube_file(str(lut_file), identity_lut(resolution=16))
+
+        cmd = [
+            "python",
+            "main.py",
+            "infer",
+            str(lut_file),
+            "nonexistent.jpg",
+            "--output-path",
+            str(temp_dir / "output.png"),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        # Should fail with file not found error
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower()
+
+
+@pytest.mark.integration
+class TestEndToEndPipeline:
+    """End-to-end pipeline tests combining optimize and infer."""
+
+    @pytest.mark.slow
+    def test_optimize_then_infer(self, sample_image_folder, temp_dir):
+        """Test complete pipeline: optimize a LUT, then use it for inference."""
+        lut_file = temp_dir / "pipeline.cube"
+        output_image = temp_dir / "result.png"
+        test_image = next(sample_image_folder.glob("*.jpg"))
+
+        # Step 1: Optimize a LUT
+        optimize_cmd = [
+            "python",
+            "main.py",
+            "optimize",
+            "--prompt",
+            "warm golden hour",
+            "--image-folder",
+            str(sample_image_folder),
+            "--steps",
+            "5",
+            "--lut-size",
+            "8",
+            "--log-interval",
+            "0",
+            "--output-path",
+            str(lut_file),
+        ]
+
+        result = subprocess.run(optimize_cmd, capture_output=True, text=True)
+        assert result.returncode == 0, f"Optimize failed: {result.stderr}"
+        assert lut_file.exists()
+
+        # Step 2: Apply the LUT to an image
+        infer_cmd = [
+            "python",
+            "main.py",
+            "infer",
+            str(lut_file),
+            str(test_image),
+            "--output-path",
+            str(output_image),
+        ]
+
+        result = subprocess.run(infer_cmd, capture_output=True, text=True)
+        assert result.returncode == 0, f"Infer failed: {result.stderr}"
+        assert output_image.exists()
+
+        # Verify the output image is valid
+        from PIL import Image
+
+        img = Image.open(output_image)
+        assert img.size[0] > 0 and img.size[1] > 0

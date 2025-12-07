@@ -164,7 +164,9 @@ class SDSLoss(LUTLoss):
         return images
 
     def forward(
-        self, transformed_images: torch.Tensor, original_images: torch.Tensor | None = None
+        self,
+        transformed_images: torch.Tensor,
+        original_images: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Compute SDS loss for a batch of images.
@@ -335,11 +337,15 @@ if __name__ == "__main__":
         loss.backward()
         logger.info(f"Gradients flowing: {dummy_images.grad is not None}")
         if dummy_images.grad is not None:
-            logger.info(f"Gradient magnitude: {dummy_images.grad.abs().mean().item():.6f}")
+            logger.info(
+                f"Gradient magnitude: {dummy_images.grad.abs().mean().item():.6f}"
+            )
 
     except Exception as e:
         logger.info(f"\nError loading model: {e}")
         logger.info("\nTo use SDS with DeepFloyd IF:")
         logger.info("1. Run: huggingface-cli login")
-        logger.info("2. Accept the license at: https://huggingface.co/DeepFloyd/IF-I-XL-v1.0")
+        logger.info(
+            "2. Accept the license at: https://huggingface.co/DeepFloyd/IF-I-XL-v1.0"
+        )
         logger.info("3. Ensure you have enough GPU memory (16GB+ recommended)")

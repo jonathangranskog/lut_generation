@@ -38,7 +38,6 @@ from utils import (
     postprocess_lut,
     read_cube_file,
     save_tensor_as_image,
-    tensor_to_pil,
     write_cube_file,
 )
 
@@ -226,7 +225,9 @@ def optimize(
     # Create dataset
     dataset = ImageDataset(image_folder, image_size=image_size)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    logger.info(f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})")
+    logger.info(
+        f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})"
+    )
 
     if test_image is None or len(test_image) == 0:
         # Pick a random sample image for logging (keep on CPU initially)
@@ -279,7 +280,7 @@ def optimize(
             img_path = log_dir_path / f"image_{idx}_original.png"
             save_tensor_as_image(sample_image_cpu, str(img_path))
             logger.info(f"Saved original sample image {idx} to {img_path}")
-        logger.info()
+        logger.info("\n")
 
     while not stop:
         for images in dataloader:
@@ -357,7 +358,11 @@ def optimize(
     if log_interval > 0:
         sample_images_device = [img.to(device) for img in sample_images_cpu]
         save_training_checkpoint(
-            step, postprocess_lut(lut_tensor), sample_images_device, log_dir_path, grayscale
+            step,
+            postprocess_lut(lut_tensor),
+            sample_images_device,
+            log_dir_path,
+            grayscale,
         )
         logger.info(f"Saved final checkpoint to {log_dir_path}/")
 

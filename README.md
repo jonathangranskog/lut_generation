@@ -1,8 +1,10 @@
-# LUT Generation (🚧 WIP 🚧)
+# LUT Generation
 
 Generate custom 3D LUTs (Look-Up Tables) for color grading using AI-guided optimization. Transform your images to match any text prompt (e.g., "golden hour", "cinematic teal and orange", "vintage film").
 
 Note: a lot of vibe-coding was used to write this code.
+
+![LUT Generation Banner](assets/banner.png)
 
 ## Features
 
@@ -55,6 +57,18 @@ python main.py infer \
   lut.cube \
   input_image.jpg \
   --output-path result.jpg
+```
+
+### 3. Run tests
+
+```bash
+pytest -v
+```
+
+The VLM test is a bit slow if you are on a non-CUDA machine and it requires huggingface credentials. You can ignore it with the below command.
+
+```bash
+pytest -v --ignore=test/test_vlm.py
 ```
 
 ## Commands
@@ -123,7 +137,8 @@ python main.py optimize \
   --image-folder images/ \
   --model-type sds \
   --output-path portra.cube \
-  --image-text-weight 10.0
+  --image-text-weight 10.0 \
+  --batch-size 1
 ```
 
 Black-and-white LUT with grayscale optimization:
@@ -163,7 +178,7 @@ python main.py infer \
 
 During optimization, the total loss consists of:
 
-1. **Image-text Loss** (~0.6-0.9): Semantic similarity to text prompt
+1. **Image-text Loss** (dependent on model): Semantic similarity to text prompt
 2. **Image Smoothness** (0.0-0.01): Prevents banding and posterization
 3. **Image Regularization** (0.0-0.1): Keeps output close to input (subtle changes)
 4. **Black Preservation** (~0.0-0.0001): Retains black levels
@@ -190,7 +205,8 @@ Higher resolution or long training of LUTs might lead to banding artifacts. To c
 * Other representations besides LUTs
 * Large-scale LUT library generation
 
-## License
+# License
 
-MIT.
+The code is licensed under the MIT License.
 
+Note that [Gemma](https://ai.google.dev/gemma/terms) and [DeepFloydIF](https://huggingface.co/spaces/DeepFloyd/deepfloyd-if-license) have their own licenses that you must follow if you use them.
