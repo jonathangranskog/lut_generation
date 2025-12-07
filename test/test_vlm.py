@@ -21,11 +21,7 @@ def test_vlm_loss():
     print(f"Using device: {device}\n")
 
     # Create loss function
-    vlm_loss = VLMLoss(
-        prompt="warm golden hour",
-        device=device,
-        model_name="gemma3_4b"
-    )
+    vlm_loss = VLMLoss(prompt="warm golden hour", device=device, model_name="gemma3_4b")
 
     # Create dummy original and transformed images with gradient tracking
     batch_size = 1

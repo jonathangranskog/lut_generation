@@ -12,16 +12,17 @@ def red_shifted_lut():
     """Create a LUT that adds a red shift to images."""
     lut = identity_lut(resolution=16).clone()  # Clone to ensure fresh copy
     # Add red shift: increase red channel by 0.15, clamp to [0, 1]
-    lut[..., 0] = torch.clamp(lut[..., 0] + 0.15, 0, 1)
+    # a bit unintuitive but the LUT is indexed as BGR
+    lut[..., 2] = torch.clamp(lut[..., 2] + 0.15, 0, 1)
     return lut
 
 
 @pytest.fixture
-def identity_lut_32():
+def identity_lut_64():
     """Provide a 32x32x32 identity LUT for more precise testing."""
     from utils.transforms import identity_lut
 
-    return identity_lut(resolution=32)
+    return identity_lut(resolution=64)
 
 
 class TestLUTIO:
@@ -48,9 +49,7 @@ class TestLUTIO:
         assert domain_max == domain_default["max"]
 
         # Check LUT values (allow small float precision differences)
-        torch.testing.assert_close(
-            red_shifted_lut, lut_reloaded, rtol=1e-5, atol=1e-5
-        )
+        torch.testing.assert_close(red_shifted_lut, lut_reloaded, rtol=1e-5, atol=1e-5)
 
     def test_write_with_custom_domain(self, identity_lut_16, temp_cube_file):
         """Test LUT writing with custom domain values."""
@@ -100,10 +99,10 @@ class TestLUTApplication:
         result = apply_lut(gradient_image, identity_lut_16)
         assert result.shape == gradient_image.shape
 
-    def test_identity_lut_unchanged(self, gradient_image, identity_lut_32):
-        """Test that identity LUT doesn't change the image (using 32x32x32 for precision)."""
-        result = apply_lut(gradient_image, identity_lut_32)
-        # Higher resolution LUT (32x32x32) gives better precision
+    def test_identity_lut_unchanged(self, gradient_image, identity_lut_64):
+        """Test that identity LUT doesn't change the image (using 64x64x64 for precision)."""
+        result = apply_lut(gradient_image, identity_lut_64)
+        # Higher resolution LUT (64x64x64) gives better precision
         # Allow small tolerance for trilinear interpolation errors
         torch.testing.assert_close(gradient_image, result, rtol=0.01, atol=0.01)
 
@@ -180,7 +179,10 @@ class TestEndToEnd:
         """Test complete pipeline: create LUT -> save -> load -> apply."""
         # Apply original LUT
         result_original = apply_lut(
-            gradient_image, red_shifted_lut, domain_default["min"], domain_default["max"]
+            gradient_image,
+            red_shifted_lut,
+            domain_default["min"],
+            domain_default["max"],
         )
 
         # Save LUT
