@@ -17,11 +17,24 @@ class ImageDataset(Dataset):
         """
         self.image_folder = image_folder
         self.image_size = image_size or CLIP_IMAGE_SIZE
-        self.image_paths = [
-            os.path.join(image_folder, f)
-            for f in os.listdir(image_folder)
-            if f.lower().endswith((".jpg", ".jpeg", ".png"))
-        ]
+
+        # Get all files and filter by checking if PIL can identify the format
+        # This supports all PIL-supported formats (JPEG, PNG, BMP, GIF, TIFF, WebP, etc.)
+        self.image_paths = []
+        for filename in os.listdir(image_folder):
+            filepath = os.path.join(image_folder, filename)
+            # Skip directories
+            if os.path.isdir(filepath):
+                continue
+            # Check if PIL recognizes this as an image format (without fully loading it)
+            try:
+                with Image.open(filepath) as img:
+                    img.format  # Access format to verify PIL can read it
+                self.image_paths.append(filepath)
+            except Exception:
+                # Not a recognized image format, skip silently
+                continue
+
         self.image_paths = sorted(self.image_paths)
         self.transform = transforms.Compose(
             [

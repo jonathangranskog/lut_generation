@@ -14,14 +14,18 @@ References:
 - DeepFloyd IF: https://github.com/deep-floyd/IF
 """
 
+import logging
+
 import torch
-import torch.nn as nn
 from diffusers import DDPMScheduler, IFPipeline
 
+from models.base import LUTLoss
 from utils.constants import DEEPFLOYD_STAGE1_MODEL, DEEPFLOYD_UNET_SIZE
 
+logger = logging.getLogger(__name__)
 
-class SDSLoss(nn.Module):
+
+class SDSLoss(LUTLoss):
     """
     Score Distillation Sampling loss using DeepFloyd IF.
 
@@ -74,11 +78,11 @@ class SDSLoss(nn.Module):
         if use_medium_model:
             model_name = "DeepFloyd/IF-I-M-v1.0"
 
-        print(f"Loading DeepFloyd IF model: {model_name}")
-        print(
+        logger.info(f"Loading DeepFloyd IF model: {model_name}")
+        logger.info(
             f"  This requires accepting the license at: https://huggingface.co/{model_name}"
         )
-        print(f"  Device: {device}, dtype: {self.dtype}")
+        logger.info(f"  Device: {device}, dtype: {self.dtype}")
 
         # Load the IF pipeline
         # Note: This requires HF authentication and license acceptance
@@ -106,7 +110,7 @@ class SDSLoss(nn.Module):
         self.noise_scheduler = DDPMScheduler.from_config(self.scheduler.config)
 
         # Pre-compute and cache text embeddings
-        print(f"Computing text embeddings for: '{prompt}'")
+        logger.info(f"Computing text embeddings for: '{prompt}'")
         with torch.no_grad():
             # Get both conditional and unconditional embeddings for CFG
             prompt_embeds, negative_prompt_embeds = self.pipe.encode_prompt(
@@ -122,9 +126,9 @@ class SDSLoss(nn.Module):
         # Get alphas for noise scheduling
         self.alphas_cumprod = self.noise_scheduler.alphas_cumprod.to(device)
 
-        print(f"SDS initialized for prompt: '{prompt}'")
-        print(f"  Guidance scale: {guidance_scale}")
-        print(f"  Timestep range: [{min_timestep}, {max_timestep}]")
+        logger.info(f"SDS initialized for prompt: '{prompt}'")
+        logger.info(f"  Guidance scale: {guidance_scale}")
+        logger.info(f"  Timestep range: [{min_timestep}, {max_timestep}]")
 
     def preprocess_images(self, images: torch.Tensor) -> torch.Tensor:
         """
@@ -160,7 +164,7 @@ class SDSLoss(nn.Module):
         return images
 
     def forward(
-        self, images: torch.Tensor, original_images: torch.Tensor | None = None
+        self, transformed_images: torch.Tensor, original_images: torch.Tensor | None = None
     ) -> torch.Tensor:
         """
         Compute SDS loss for a batch of images.
@@ -172,16 +176,16 @@ class SDSLoss(nn.Module):
         the input images but not through the UNet.
 
         Args:
-            images: Batch of images in [0, 1] range, shape (B, C, H, W)
-            original_images: Unused (for compatibility with VLMLoss signature)
+            transformed_images: Batch of images in [0, 1] range, shape (B, C, H, W)
+            original_images: Unused (for compatibility with base class signature)
 
         Returns:
             Scalar loss value
         """
-        batch_size = images.shape[0]
+        batch_size = transformed_images.shape[0]
 
         # Preprocess images to [-1, 1] at 64x64
-        x0 = self.preprocess_images(images)
+        x0 = self.preprocess_images(transformed_images)
 
         # Sample random timesteps for each image in batch
         timesteps = torch.randint(
@@ -301,10 +305,10 @@ class SDSLoss(nn.Module):
 if __name__ == "__main__":
     # Test the SDS loss
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
 
     if device == "cpu":
-        print("Warning: SDS on CPU will be very slow. Use CUDA if available.")
+        logger.info("Warning: SDS on CPU will be very slow. Use CUDA if available.")
 
     # Note: This requires HuggingFace authentication and license acceptance
     # Run: huggingface-cli login
@@ -325,17 +329,17 @@ if __name__ == "__main__":
 
         # Compute loss
         loss = sds_loss(dummy_images)
-        print(f"\nSDS Loss: {loss.item():.6f}")
+        logger.info(f"\nSDS Loss: {loss.item():.6f}")
 
         # Test gradient flow
         loss.backward()
-        print(f"Gradients flowing: {dummy_images.grad is not None}")
+        logger.info(f"Gradients flowing: {dummy_images.grad is not None}")
         if dummy_images.grad is not None:
-            print(f"Gradient magnitude: {dummy_images.grad.abs().mean().item():.6f}")
+            logger.info(f"Gradient magnitude: {dummy_images.grad.abs().mean().item():.6f}")
 
     except Exception as e:
-        print(f"\nError loading model: {e}")
-        print("\nTo use SDS with DeepFloyd IF:")
-        print("1. Run: huggingface-cli login")
-        print("2. Accept the license at: https://huggingface.co/DeepFloyd/IF-I-XL-v1.0")
-        print("3. Ensure you have enough GPU memory (16GB+ recommended)")
+        logger.info(f"\nError loading model: {e}")
+        logger.info("\nTo use SDS with DeepFloyd IF:")
+        logger.info("1. Run: huggingface-cli login")
+        logger.info("2. Accept the license at: https://huggingface.co/DeepFloyd/IF-I-XL-v1.0")
+        logger.info("3. Ensure you have enough GPU memory (16GB+ recommended)")

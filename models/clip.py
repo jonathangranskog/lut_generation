@@ -4,14 +4,18 @@ CLIP-based loss for LUT optimization.
 Uses CLIP to compute a loss between transformed images and a text prompt.
 """
 
+import logging
+
 import torch
-import torch.nn as nn
 from transformers import CLIPModel, CLIPTokenizer
 
+from models.base import LUTLoss
 from utils.constants import CLIP_IMAGE_SIZE, CLIP_MEAN, CLIP_STD
 
+logger = logging.getLogger(__name__)
 
-class CLIPLoss(nn.Module):
+
+class CLIPLoss(LUTLoss):
     """
     CLIP-based cosine similarity loss for image-text alignment.
 
@@ -39,7 +43,7 @@ class CLIPLoss(nn.Module):
         self.prompt = prompt
 
         # Load CLIP model and tokenizer
-        print(f"Loading CLIP model: {model_name}")
+        logger.info(f"Loading CLIP model: {model_name}")
         self.model = CLIPModel.from_pretrained(model_name).to(device)
         self.tokenizer = CLIPTokenizer.from_pretrained(model_name)
 
@@ -64,7 +68,7 @@ class CLIPLoss(nn.Module):
                 dim=-1, keepdim=True
             )
 
-        print(f"Text embedding computed for prompt: '{prompt}'")
+        logger.info(f"Text embedding computed for prompt: '{prompt}'")
 
     def preprocess_images(self, images: torch.Tensor) -> torch.Tensor:
         """
@@ -101,20 +105,20 @@ class CLIPLoss(nn.Module):
         return normalized
 
     def forward(
-        self, images: torch.Tensor, original_images: torch.Tensor | None = None
+        self, transformed_images: torch.Tensor, original_images: torch.Tensor | None = None
     ) -> torch.Tensor:
         """
         Compute CLIP cosine similarity loss between images and text prompt.
 
         Args:
-            images: Batch of images in [0, 1] range, shape (B, C, H, W)
-            original_images: Unused (for compatibility with VLMLoss signature)
+            transformed_images: Batch of images in [0, 1] range, shape (B, C, H, W)
+            original_images: Unused (for compatibility with base class signature)
 
         Returns:
             Scalar loss value (1 - mean cosine similarity across batch)
         """
         # Preprocess images for CLIP (differentiable)
-        processed_images = self.preprocess_images(images)
+        processed_images = self.preprocess_images(transformed_images)
 
         # Get image embeddings (gradients flow through images, not CLIP params)
         image_features = self.model.get_image_features(pixel_values=processed_images)
@@ -173,15 +177,15 @@ if __name__ == "__main__":
 
     # Compute loss
     loss = clip_loss(dummy_images)
-    print(f"\nInitial Loss: {loss.item():.4f}")
+    logger.info(f"\nInitial Loss: {loss.item():.4f}")
 
     # Test gradient flow
     loss.backward()
-    print(f"✓ Gradients flowing: {dummy_images.grad is not None}")
-    print(f"  Gradient magnitude: {dummy_images.grad.abs().mean().item():.6f}")
+    logger.info(f"✓ Gradients flowing: {dummy_images.grad is not None}")
+    logger.info(f"  Gradient magnitude: {dummy_images.grad.abs().mean().item():.6f}")
 
     # Simulate a few optimization steps
-    print("\nSimulating LUT optimization:")
+    logger.info("\nSimulating LUT optimization:")
     dummy_images = torch.rand(batch_size, 3, 224, 224, requires_grad=True).to(device)
     optimizer = torch.optim.Adam([dummy_images], lr=0.1)
 
@@ -195,10 +199,10 @@ if __name__ == "__main__":
         with torch.no_grad():
             dummy_images.clamp_(0, 1)
 
-        print(f"  Step {step + 1}: Loss = {loss.item():.4f}")
+        logger.info(f"  Step {step + 1}: Loss = {loss.item():.4f}")
 
     # Compute final similarity
     with torch.no_grad():
         similarity = clip_loss.compute_similarity(dummy_images)
-        print(f"\nFinal similarities: {similarity.cpu().numpy()}")
-        print(f"Mean similarity: {similarity.mean().item():.4f}")
+        logger.info(f"\nFinal similarities: {similarity.cpu().numpy()}")
+        logger.info(f"Mean similarity: {similarity.mean().item():.4f}")
