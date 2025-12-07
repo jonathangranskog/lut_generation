@@ -280,7 +280,7 @@ def optimize(
             img_path = log_dir_path / f"image_{idx}_original.png"
             save_tensor_as_image(sample_image_cpu, str(img_path))
             logger.info(f"Saved original sample image {idx} to {img_path}")
-        logger.info()
+        logger.info('\n')
 
     while not stop:
         for images in dataloader:
