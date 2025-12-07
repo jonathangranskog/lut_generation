@@ -93,7 +93,9 @@ class VLMLoss(LUTLoss):
             logger.info(f"Loading VLM model: {hf_model_name}")
 
         if device == "cpu":
-            logger.info("  Warning: Running VLM on CPU will be very slow (~minutes per step)")
+            logger.info(
+                "  Warning: Running VLM on CPU will be very slow (~minutes per step)"
+            )
         self.model = Gemma3ForConditionalGeneration.from_pretrained(
             hf_model_name,
             device_map=device,
@@ -121,7 +123,9 @@ class VLMLoss(LUTLoss):
 
         logger.info(f"VLM initialized for prompt: '{prompt}'")
         logger.info(f"  Question: {self.question}")
-        logger.info(f"  Yes token ID: {self.yes_token_id}, No token ID: {self.no_token_id}")
+        logger.info(
+            f"  Yes token ID: {self.yes_token_id}, No token ID: {self.no_token_id}"
+        )
 
     def _prepare_prompt(self):
         """Pre-compute input_ids and Yes/No token IDs for comparison mode (2 images)."""
@@ -190,7 +194,9 @@ class VLMLoss(LUTLoss):
         return normalized
 
     def forward(
-        self, transformed_images: torch.Tensor, original_images: torch.Tensor | None = None
+        self,
+        transformed_images: torch.Tensor,
+        original_images: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Compute contrastive VLM loss between original and transformed images.
@@ -214,7 +220,9 @@ class VLMLoss(LUTLoss):
 
         # Preprocess both image sets (differentiable)
         original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
-        transformed_pixel_values = self.preprocess_images(transformed_images).to(self.dtype)
+        transformed_pixel_values = self.preprocess_images(transformed_images).to(
+            self.dtype
+        )
 
         # Interleave original and transformed images for the batch
         # Shape: (B*2, C, H, W) where pairs are [orig_0, trans_0, orig_1, trans_1, ...]

@@ -19,7 +19,9 @@ class LUTLoss(nn.Module, ABC):
 
     @abstractmethod
     def forward(
-        self, transformed_images: torch.Tensor, original_images: torch.Tensor | None = None
+        self,
+        transformed_images: torch.Tensor,
+        original_images: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Compute loss for transformed images.

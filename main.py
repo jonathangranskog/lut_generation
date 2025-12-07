@@ -225,7 +225,9 @@ def optimize(
     # Create dataset
     dataset = ImageDataset(image_folder, image_size=image_size)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    logger.info(f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})")
+    logger.info(
+        f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})"
+    )
 
     if test_image is None or len(test_image) == 0:
         # Pick a random sample image for logging (keep on CPU initially)
@@ -356,7 +358,11 @@ def optimize(
     if log_interval > 0:
         sample_images_device = [img.to(device) for img in sample_images_cpu]
         save_training_checkpoint(
-            step, postprocess_lut(lut_tensor), sample_images_device, log_dir_path, grayscale
+            step,
+            postprocess_lut(lut_tensor),
+            sample_images_device,
+            log_dir_path,
+            grayscale,
         )
         logger.info(f"Saved final checkpoint to {log_dir_path}/")
 
