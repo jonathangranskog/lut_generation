@@ -8,6 +8,7 @@ It can use either CLIP, Score Distillation Sampling or VLMs to optimize the LUT.
 Using the `infer` command, this script will apply a LUT to an image.
 """
 
+import logging
 import os
 import random
 import re
@@ -37,11 +38,17 @@ from utils import (
     postprocess_lut,
     read_cube_file,
     save_tensor_as_image,
-    tensor_to_pil,
     write_cube_file,
 )
 
 ModelType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", "sds"]
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",  # Simple format for CLI output
+)
+logger = logging.getLogger(__name__)
 
 app = typer.Typer()
 
@@ -178,6 +185,7 @@ def optimize(
     output_path: str = "lut.cube",
     test_image: list[str] | None = None,
     grayscale: bool = False,
+    log_dir: str | None = None,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
@@ -186,15 +194,24 @@ def optimize(
     Image smoothness penalizes banding and discontinuities in output images.
     Image regularization keeps output images close to input images (subtle changes).
     Black preservation prevents faded/lifted blacks (maintains deep shadows).
-    Every log_interval steps, saves LUT and sample image to tmp/training_logs/.
+    Every log_interval steps, saves LUT and sample image to training logs directory.
     Grayscale optimizes a black-and-white LUT (single channel) that outputs same intensity for RGB.
+    Log directory can be customized via --log-dir (default: tmp/training_logs/<sanitized_prompt>/).
 
     Note: Gemma 3 models use comparison mode by default, evaluating transformations by comparing
     original and transformed images for more context-aware color grading.
     """
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
-    print(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
+
+    # Validate LUT size
+    valid_lut_sizes = [8, 16, 32, 64]
+    if lut_size not in valid_lut_sizes:
+        raise ValueError(
+            f"LUT size must be one of {valid_lut_sizes}, got {lut_size}. "
+            f"Larger sizes (>64) are prone to artifacts, smaller sizes (<8) lack detail."
+        )
 
     # Select image size based on model type
     if model_type == "clip":
@@ -208,18 +225,20 @@ def optimize(
     # Create dataset
     dataset = ImageDataset(image_folder, image_size=image_size)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    print(f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})")
+    logger.info(
+        f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})"
+    )
 
     if test_image is None or len(test_image) == 0:
         # Pick a random sample image for logging (keep on CPU initially)
         sample_idx = random.randint(0, len(dataset) - 1)
         sample_images_cpu = [dataset[sample_idx]]  # List of (C, H, W) tensors
-        print(f"Selected sample image index {sample_idx} for logging")
+        logger.info(f"Selected sample image index {sample_idx} for logging")
     else:
         sample_images_cpu = [load_image_as_tensor(img_path) for img_path in test_image]
-        print(f"Loaded {len(test_image)} test images:")
+        logger.info(f"Loaded {len(test_image)} test images:")
         for img_path in test_image:
-            print(f"  - {img_path}")
+            logger.info(f"  - {img_path}")
 
     # Create loss function
     if model_type == "clip":
@@ -242,21 +261,26 @@ def optimize(
     # Training loop
     step = 0
     stop = False
-    pbar = tqdm(total=step, desc="Optimizing LUT") if not verbose else None
+    pbar = tqdm(total=steps, desc="Optimizing LUT") if not verbose else None
 
-    # Create log directory based on prompt
-    prompt_folder = sanitize_prompt_for_filename(prompt)
-    log_dir = Path("tmp/training_logs") / prompt_folder
+    # Create log directory
+    if log_dir is None:
+        # Default: tmp/training_logs/<sanitized_prompt>/
+        prompt_folder = sanitize_prompt_for_filename(prompt)
+        log_dir_path = Path("tmp/training_logs") / prompt_folder
+    else:
+        log_dir_path = Path(log_dir)
+
     if log_interval > 0:
-        print(f"Training logs will be saved to: {log_dir}/\n")
+        logger.info(f"Training logs will be saved to: {log_dir_path}/\n")
 
         # Save the original (untransformed) sample images
-        log_dir.mkdir(parents=True, exist_ok=True)
+        log_dir_path.mkdir(parents=True, exist_ok=True)
         for idx, sample_image_cpu in enumerate(sample_images_cpu):
-            img_path = log_dir / f"image_{idx}_original.png"
+            img_path = log_dir_path / f"image_{idx}_original.png"
             save_tensor_as_image(sample_image_cpu, str(img_path))
-            print(f"Saved original sample image {idx} to {img_path}")
-        print()
+            logger.info(f"Saved original sample image {idx} to {img_path}")
+        logger.info('\n')
 
     while not stop:
         for images in dataloader:
@@ -300,11 +324,11 @@ def optimize(
                     step,
                     postprocess_lut(lut_tensor),
                     sample_images_device,
-                    log_dir,
+                    log_dir_path,
                     grayscale,
                 )
                 if verbose:
-                    print(f"  → Saved checkpoint to {log_dir}/")
+                    logger.info(f"  → Saved checkpoint to {log_dir_path}/")
 
             # Logging
             if verbose and step % 10 == 0:
@@ -318,7 +342,7 @@ def optimize(
                     black_preservation,
                     lut_smoothness,
                 )
-                print(log_msg)
+                logger.info(log_msg)
             elif pbar is not None:
                 pbar.update(1)
                 pbar.set_postfix({"loss": f"{loss.item():.4f}"})
@@ -334,11 +358,15 @@ def optimize(
     if log_interval > 0:
         sample_images_device = [img.to(device) for img in sample_images_cpu]
         save_training_checkpoint(
-            step, postprocess_lut(lut_tensor), sample_images_device, log_dir, grayscale
+            step,
+            postprocess_lut(lut_tensor),
+            sample_images_device,
+            log_dir_path,
+            grayscale,
         )
-        print(f"Saved final checkpoint to {log_dir}/")
+        logger.info(f"Saved final checkpoint to {log_dir_path}/")
 
-    print(f"\nOptimization complete! Final loss: {loss.item():.4f}")
+    logger.info(f"\nOptimization complete! Final loss: {loss.item():.4f}")
 
     # Save LUT
     domain_min = [0.0, 0.0, 0.0]
@@ -348,10 +376,10 @@ def optimize(
         lut_tensor.detach().cpu(),
         domain_min,
         domain_max,
-        title=f"CLIP: {prompt}",
+        title=f"{model_type.upper()}: {prompt}",
         grayscale=grayscale,
     )
-    print(f"LUT saved to {output_path}")
+    logger.info(f"LUT saved to {output_path}")
 
 
 @app.command()

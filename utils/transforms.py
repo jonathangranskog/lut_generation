@@ -5,8 +5,8 @@ import torch.nn.functional as F
 def apply_lut(
     image: torch.Tensor,
     lut_tensor: torch.Tensor,
-    domain_min: list = [0.0, 0.0, 0.0],
-    domain_max: list = [1.0, 1.0, 1.0],
+    domain_min: list[float] | None = None,
+    domain_max: list[float] | None = None,
 ) -> torch.Tensor:
     """
     Apply a 3D LUT using PyTorch's grid_sample for trilinear interpolation
@@ -24,6 +24,11 @@ def apply_lut(
     Returns:
         LUT-applied image(s) in the same format as input (always 3-channel output)
     """
+    if domain_min is None:
+        domain_min = [0.0, 0.0, 0.0]
+    if domain_max is None:
+        domain_max = [1.0, 1.0, 1.0]
+
     is_batched = image.ndim == 4
 
     # Normalize to (B, H, W, C) format

@@ -8,10 +8,15 @@ Adapted from Dual-Process Image Generation:
 https://github.com/g-luo/dual_process
 """
 
+import logging
+
 import torch
-import torch.nn as nn
 from PIL import Image
 from transformers import AutoProcessor, Gemma3ForConditionalGeneration
+
+from models.base import LUTLoss
+
+logger = logging.getLogger(__name__)
 
 # Gemma 3 prompt template
 GEMMA_IMAGE_TOKEN = "<start_of_image>"
@@ -30,7 +35,7 @@ MODEL_NAME_MAP = {
 }
 
 
-class VLMLoss(nn.Module):
+class VLMLoss(LUTLoss):
     """
     VLM-based loss for image-text alignment via contrastive Yes/No scoring.
 
@@ -73,20 +78,24 @@ class VLMLoss(nn.Module):
 
         # Set default question template (comparison mode)
         if question_template is None:
-            question_template = "Looking at these two images, has the '{prompt}' color grade been successfully applied to transform the first image into the second? Answer Yes or No."
-
-        self.question = question_template.format(prompt=prompt)
+            question_template = f"Looking at these two images, has the '{prompt}' color grade been successfully applied to transform the first image into the second? Answer Yes or No."
+            self.question = question_template
+        else:
+            # Custom template may have {prompt} placeholder
+            self.question = question_template.replace("{prompt}", prompt)
 
         # Map model type to HuggingFace identifier if needed
         if model_name in MODEL_NAME_MAP:
             hf_model_name = MODEL_NAME_MAP[model_name]
-            print(f"Loading VLM model: {model_name} ({hf_model_name})")
+            logger.info(f"Loading VLM model: {model_name} ({hf_model_name})")
         else:
             hf_model_name = model_name
-            print(f"Loading VLM model: {hf_model_name}")
+            logger.info(f"Loading VLM model: {hf_model_name}")
 
         if device == "cpu":
-            print("  Warning: Running VLM on CPU will be very slow (~minutes per step)")
+            logger.info(
+                "  Warning: Running VLM on CPU will be very slow (~minutes per step)"
+            )
         self.model = Gemma3ForConditionalGeneration.from_pretrained(
             hf_model_name,
             device_map=device,
@@ -112,9 +121,11 @@ class VLMLoss(nn.Module):
         # Pre-compute prompt tokens and Yes/No token IDs
         self._prepare_prompt()
 
-        print(f"VLM initialized for prompt: '{prompt}'")
-        print(f"  Question: {self.question}")
-        print(f"  Yes token ID: {self.yes_token_id}, No token ID: {self.no_token_id}")
+        logger.info(f"VLM initialized for prompt: '{prompt}'")
+        logger.info(f"  Question: {self.question}")
+        logger.info(
+            f"  Yes token ID: {self.yes_token_id}, No token ID: {self.no_token_id}"
+        )
 
     def _prepare_prompt(self):
         """Pre-compute input_ids and Yes/No token IDs for comparison mode (2 images)."""
@@ -122,9 +133,11 @@ class VLMLoss(nn.Module):
         image_token = GEMMA_IMAGE_TOKEN + GEMMA_IMAGE_TOKEN
         num_images = 2
 
-        text = GEMMA_TEMPLATE.format(
-            image_token=image_token,
-            question=self.question,
+        text = (
+            f"<bos><start_of_turn>user\n"
+            f"You are a helpful assistant.\n\n"
+            f"{image_token}{self.question}<end_of_turn>\n"
+            f"<start_of_turn>model\n"
         )
 
         # Create blank images for tokenization (will be replaced during forward)
@@ -181,7 +194,9 @@ class VLMLoss(nn.Module):
         return normalized
 
     def forward(
-        self, images: torch.Tensor, original_images: torch.Tensor
+        self,
+        transformed_images: torch.Tensor,
+        original_images: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Compute contrastive VLM loss between original and transformed images.
@@ -192,17 +207,22 @@ class VLMLoss(nn.Module):
         - Lower loss = model more confident transformation matches prompt
 
         Args:
-            images: Batch of transformed images in [0, 1] range, shape (B, C, H, W)
+            transformed_images: Batch of transformed images in [0, 1] range, shape (B, C, H, W)
             original_images: Batch of original images in [0, 1] range, shape (B, C, H, W)
 
         Returns:
             Scalar loss value (log P(No) - log P(Yes), lower is better)
         """
-        batch_size = images.shape[0]
+        if original_images is None:
+            raise ValueError("VLMLoss requires original_images for comparison mode")
+
+        batch_size = transformed_images.shape[0]
 
         # Preprocess both image sets (differentiable)
         original_pixel_values = self.preprocess_images(original_images).to(self.dtype)
-        transformed_pixel_values = self.preprocess_images(images).to(self.dtype)
+        transformed_pixel_values = self.preprocess_images(transformed_images).to(
+            self.dtype
+        )
 
         # Interleave original and transformed images for the batch
         # Shape: (B*2, C, H, W) where pairs are [orig_0, trans_0, orig_1, trans_1, ...]
@@ -333,11 +353,11 @@ class VLMLoss(nn.Module):
 if __name__ == "__main__":
     # Test the VLM loss with gradient flow
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
 
     # Create loss function
     vlm_loss = VLMLoss(prompt="kodak aerochrome infrared film", device=device)
-    print(f"Using dtype: {vlm_loss.dtype}")
+    logger.info(f"Using dtype: {vlm_loss.dtype}")
 
     # Create dummy batch of images with gradient tracking
     batch_size = 1
@@ -347,18 +367,18 @@ if __name__ == "__main__":
 
     # Compute loss
     loss = vlm_loss(dummy_images)
-    print(f"\nContrastive Loss: {loss.item():.4f}")
-    print("  (negative = Yes more likely, positive = No more likely)")
+    logger.info(f"\nContrastive Loss: {loss.item():.4f}")
+    logger.info("  (negative = Yes more likely, positive = No more likely)")
 
     # Get probabilities
     p_yes, p_no = vlm_loss.get_yes_no_probs(dummy_images)
-    print(f"P(Yes): {p_yes.item():.4f}, P(No): {p_no.item():.4f}")
+    logger.info(f"P(Yes): {p_yes.item():.4f}, P(No): {p_no.item():.4f}")
 
     pred = vlm_loss.get_prediction(dummy_images)
-    print(f"Prediction: {pred}")
+    logger.info(f"Prediction: {pred}")
 
     # Test gradient flow
     loss.backward()
-    print(f"\nGradients flowing: {dummy_images.grad is not None}")
+    logger.info(f"\nGradients flowing: {dummy_images.grad is not None}")
     if dummy_images.grad is not None:
-        print(f"Gradient magnitude: {dummy_images.grad.abs().mean().item():.6f}")
+        logger.info(f"Gradient magnitude: {dummy_images.grad.abs().mean().item():.6f}")

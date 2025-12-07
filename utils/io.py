@@ -1,5 +1,4 @@
 import re
-from typing import Tuple
 
 import numpy as np
 import torch
@@ -14,7 +13,7 @@ def load_image_as_tensor(image_path: str) -> torch.Tensor:
     return image_tensor
 
 
-def read_cube_file(lut_path: str) -> Tuple[torch.Tensor, list, list]:
+def read_cube_file(lut_path: str) -> tuple[torch.Tensor, list[float], list[float]]:
     """
     Load a .cube LUT file and return as a PyTorch tensor
 
@@ -94,8 +93,8 @@ def read_cube_file(lut_path: str) -> Tuple[torch.Tensor, list, list]:
 def write_cube_file(
     lut_path: str,
     lut_tensor: torch.Tensor,
-    domain_min: list = [0.0, 0.0, 0.0],
-    domain_max: list = [1.0, 1.0, 1.0],
+    domain_min: list[float] | None = None,
+    domain_max: list[float] | None = None,
     title: str = "Generated LUT",
     grayscale: bool = False,
 ) -> None:
@@ -110,6 +109,11 @@ def write_cube_file(
         title: Optional title for the LUT file
         grayscale: If True, replicates single-channel LUT to 3 channels (R=G=B) when saving
     """
+    if domain_min is None:
+        domain_min = [0.0, 0.0, 0.0]
+    if domain_max is None:
+        domain_max = [1.0, 1.0, 1.0]
+
     assert lut_tensor.ndim == 4, "LUT tensor must be 4D (size, size, size, C)"
     assert lut_tensor.shape[-1] in [1, 3], "LUT tensor must have 1 or 3 channels"
     assert len(domain_min) == 3, "Domain min must be a 3-element list"
