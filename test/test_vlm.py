@@ -21,16 +21,13 @@ def test_vlm_loss():
     print(f"Using device: {device}\n")
 
     # Create loss function
-    vlm_loss = VLMLoss(
-        prompt="warm golden hour",
-        device=device,
-    )
+    vlm_loss = VLMLoss(prompt="warm golden hour", device=device, model_name="gemma3_4b")
 
     # Create dummy original and transformed images with gradient tracking
-    batch_size = 2
-    original_images = torch.rand(batch_size, 3, 512, 512, device=device)
+    batch_size = 1
+    original_images = torch.rand(batch_size, 3, 256, 256, device=device)
     transformed_images = torch.rand(
-        batch_size, 3, 512, 512, device=device, requires_grad=True
+        batch_size, 3, 256, 256, device=device, requires_grad=True
     )
 
     # Compute loss
