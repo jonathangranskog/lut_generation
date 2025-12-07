@@ -210,6 +210,13 @@ def optimize(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     print(f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})")
 
+    # Validate dataset is not empty
+    if len(dataset) == 0:
+        raise ValueError(
+            f"No valid images found in {image_folder}. "
+            f"Please ensure the folder contains .jpg, .jpeg, or .png files."
+        )
+
     if test_image is None or len(test_image) == 0:
         # Pick a random sample image for logging (keep on CPU initially)
         sample_idx = random.randint(0, len(dataset) - 1)
@@ -242,7 +249,7 @@ def optimize(
     # Training loop
     step = 0
     stop = False
-    pbar = tqdm(total=step, desc="Optimizing LUT") if not verbose else None
+    pbar = tqdm(total=steps, desc="Optimizing LUT") if not verbose else None
 
     # Create log directory based on prompt
     prompt_folder = sanitize_prompt_for_filename(prompt)
@@ -348,7 +355,7 @@ def optimize(
         lut_tensor.detach().cpu(),
         domain_min,
         domain_max,
-        title=f"CLIP: {prompt}",
+        title=f"{model_type.upper()}: {prompt}",
         grayscale=grayscale,
     )
     print(f"LUT saved to {output_path}")
