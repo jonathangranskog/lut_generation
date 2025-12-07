@@ -36,6 +36,14 @@ class ImageDataset(Dataset):
                 continue
 
         self.image_paths = sorted(self.image_paths)
+
+        # Validate dataset is not empty
+        if len(self.image_paths) == 0:
+            raise ValueError(
+                f"No valid images found in {image_folder}. "
+                f"Please ensure the folder contains image files that PIL can read."
+            )
+
         self.transform = transforms.Compose(
             [
                 transforms.RandomCrop((self.image_size)),

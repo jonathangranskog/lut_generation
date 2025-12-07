@@ -228,13 +228,6 @@ def optimize(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     logger.info(f"Loaded {len(dataset)} images from {image_folder} (crop size: {image_size})")
 
-    # Validate dataset is not empty
-    if len(dataset) == 0:
-        raise ValueError(
-            f"No valid images found in {image_folder}. "
-            f"Please ensure the folder contains .jpg, .jpeg, or .png files."
-        )
-
     if test_image is None or len(test_image) == 0:
         # Pick a random sample image for logging (keep on CPU initially)
         sample_idx = random.randint(0, len(dataset) - 1)
