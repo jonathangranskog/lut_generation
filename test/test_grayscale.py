@@ -76,12 +76,8 @@ class TestGrayscaleLUTApplication:
 
         # Verify all outputs are grayscale
         for i in range(batch_images.shape[0]):
-            diff_rg = torch.abs(
-                batch_transformed[i, 0] - batch_transformed[i, 1]
-            ).max()
-            diff_gb = torch.abs(
-                batch_transformed[i, 1] - batch_transformed[i, 2]
-            ).max()
+            diff_rg = torch.abs(batch_transformed[i, 0] - batch_transformed[i, 1]).max()
+            diff_gb = torch.abs(batch_transformed[i, 1] - batch_transformed[i, 2]).max()
             assert diff_rg < 1e-5
             assert diff_gb < 1e-5
 
@@ -135,9 +131,7 @@ class TestGrayscaleLUTIO:
     def test_loaded_grayscale_lut_works(self, grayscale_lut_16, temp_cube_file):
         """Loaded grayscale LUT should produce grayscale output."""
         # Save and load
-        write_cube_file(
-            temp_cube_file, grayscale_lut_16, grayscale=True, title="Test"
-        )
+        write_cube_file(temp_cube_file, grayscale_lut_16, grayscale=True, title="Test")
         loaded_lut, _, _ = read_cube_file(temp_cube_file)
 
         # Apply to test image

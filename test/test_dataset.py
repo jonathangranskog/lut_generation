@@ -233,6 +233,7 @@ class TestImageDatasetTransforms:
 
         # Verify transform is a Compose with multiple transforms
         from torchvision import transforms
+
         assert isinstance(dataset.transform, transforms.Compose)
 
         # Should have multiple transforms (crop, flips, blur, to_tensor)
@@ -316,9 +317,7 @@ class TestImageDatasetDataLoader:
         assert total_images == len(dataset)
 
     @pytest.mark.parametrize("batch_size", [1, 2, 4])
-    def test_dataloader_various_batch_sizes(
-        self, image_folder_with_images, batch_size
-    ):
+    def test_dataloader_various_batch_sizes(self, image_folder_with_images, batch_size):
         """DataLoader should work with various batch sizes."""
         dataset = ImageDataset(image_folder_with_images)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)

@@ -83,9 +83,9 @@ class TestImageRegularizationLoss:
 
         loss = image_regularization_loss(images, images)
 
-        assert torch.isclose(
-            loss, torch.tensor(0.0), atol=1e-6
-        ), "Identical images should have zero loss"
+        assert torch.isclose(loss, torch.tensor(0.0), atol=1e-6), (
+            "Identical images should have zero loss"
+        )
 
     def test_different_images_positive_loss(self):
         """Different images should have positive loss."""
@@ -119,9 +119,7 @@ class TestImageRegularizationLoss:
         transformed_large = original + 0.1
         loss_large = image_regularization_loss(transformed_large, original)
 
-        assert (
-            loss_large > loss_small
-        ), "Larger differences should produce larger loss"
+        assert loss_large > loss_small, "Larger differences should produce larger loss"
 
 
 class TestBlackLevelPreservationLoss:
@@ -141,9 +139,9 @@ class TestBlackLevelPreservationLoss:
 
         loss = black_level_preservation_loss(transformed, original, threshold=0.01)
 
-        assert torch.isclose(
-            loss, torch.tensor(0.0), atol=1e-6
-        ), "Preserved blacks should have zero loss"
+        assert torch.isclose(loss, torch.tensor(0.0), atol=1e-6), (
+            "Preserved blacks should have zero loss"
+        )
 
     def test_lifted_blacks_positive_loss(self):
         """When dark pixels are lifted, loss should be positive."""
@@ -177,9 +175,9 @@ class TestBlackLevelPreservationLoss:
 
         loss = black_level_preservation_loss(transformed, original, threshold=0.01)
 
-        assert torch.isclose(
-            loss, torch.tensor(0.0), atol=1e-6
-        ), "Making blacks darker should not be penalized"
+        assert torch.isclose(loss, torch.tensor(0.0), atol=1e-6), (
+            "Making blacks darker should not be penalized"
+        )
 
     def test_threshold_effect(self):
         """Test that threshold parameter affects which pixels are considered dark."""
@@ -199,9 +197,9 @@ class TestBlackLevelPreservationLoss:
             transformed, original, threshold=0.02
         )
 
-        assert (
-            loss_low_threshold > loss_high_threshold
-        ), "Higher threshold should capture more pixels as dark"
+        assert loss_low_threshold > loss_high_threshold, (
+            "Higher threshold should capture more pixels as dark"
+        )
 
     def test_luma_calculation(self):
         """Test that luminance is calculated correctly using Rec. 709."""
@@ -226,9 +224,9 @@ class TestBlackLevelPreservationLoss:
         loss_blue = black_level_preservation_loss(blue, dark_original, threshold=0.1)
 
         # Green has highest coefficient, so should produce highest loss
-        assert (
-            loss_green > loss_red and loss_green > loss_blue
-        ), "Green should contribute most to luminance"
+        assert loss_green > loss_red and loss_green > loss_blue, (
+            "Green should contribute most to luminance"
+        )
 
     def test_gradient_flow(self):
         """Test gradient flow through the loss."""
@@ -314,9 +312,9 @@ class TestComputeLosses:
             lut_smoothness=0.0,
         )
 
-        assert torch.isclose(
-            loss, torch.tensor(2.0)
-        ), "Loss should be weighted primary loss"
+        assert torch.isclose(loss, torch.tensor(2.0)), (
+            "Loss should be weighted primary loss"
+        )
         assert "primary" in components, "Should have primary loss component"
         assert len(components) == 1, "Should only have primary component"
 
@@ -358,9 +356,9 @@ class TestComputeLosses:
             + 0.3 * components["black"]
             + 0.4 * components["lut_smooth"]
         )
-        assert torch.isclose(
-            loss, expected_loss, atol=1e-6
-        ), "Total loss should be sum of weighted components"
+        assert torch.isclose(loss, expected_loss, atol=1e-6), (
+            "Total loss should be sum of weighted components"
+        )
 
     def test_selective_losses(self):
         """Test with selective loss components."""
@@ -444,9 +442,9 @@ class TestComputeLosses:
         )
 
         # Only primary should be present
-        assert set(components.keys()) == {
-            "primary"
-        }, "Zero-weighted losses should not be computed"
+        assert set(components.keys()) == {"primary"}, (
+            "Zero-weighted losses should not be computed"
+        )
 
     @pytest.mark.parametrize(
         "weights",

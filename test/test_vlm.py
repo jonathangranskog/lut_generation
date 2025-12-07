@@ -13,6 +13,7 @@ def _is_huggingface_logged_in():
     """Check if user is logged in to HuggingFace."""
     try:
         from huggingface_hub import get_token
+
         return get_token() is not None
     except ImportError:
         return False
@@ -62,7 +63,9 @@ class TestVLMGradientFlow:
         image_size = VLM_IMAGE_SIZE
 
         # Create images with gradient tracking
-        transformed = torch.rand(batch_size, 3, image_size, image_size, requires_grad=True)
+        transformed = torch.rand(
+            batch_size, 3, image_size, image_size, requires_grad=True
+        )
         original = torch.rand(batch_size, 3, image_size, image_size)
 
         # Simulate a simple VLM-like loss (difference between images)
@@ -71,7 +74,9 @@ class TestVLMGradientFlow:
         # Test gradient flow
         mock_loss.backward()
 
-        assert transformed.grad is not None, "Gradients should flow to transformed images"
+        assert transformed.grad is not None, (
+            "Gradients should flow to transformed images"
+        )
         assert transformed.grad.shape == transformed.shape
         assert not torch.isnan(transformed.grad).any()
         assert not torch.isinf(transformed.grad).any()
@@ -80,7 +85,9 @@ class TestVLMGradientFlow:
         """Test that gradient magnitudes are reasonable."""
         from utils.constants import VLM_IMAGE_SIZE
 
-        transformed = torch.rand(2, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, requires_grad=True)
+        transformed = torch.rand(
+            2, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, requires_grad=True
+        )
         original = torch.rand(2, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE)
 
         mock_loss = torch.nn.functional.mse_loss(transformed, original)
@@ -167,6 +174,7 @@ class TestVLMContextAware:
 
         # VLMLoss.forward should require original_images parameter
         import inspect
+
         sig = inspect.signature(VLMLoss.forward)
         params = list(sig.parameters.keys())
 
@@ -182,14 +190,18 @@ class TestVLMContextAware:
         from models.vlm import VLMLoss
 
         # Check that the class exists and has expected structure
-        assert hasattr(VLMLoss, 'forward')
-        assert hasattr(VLMLoss, 'get_yes_no_probs')
-        assert hasattr(VLMLoss, 'get_prediction')
+        assert hasattr(VLMLoss, "forward")
+        assert hasattr(VLMLoss, "get_yes_no_probs")
+        assert hasattr(VLMLoss, "get_prediction")
 
 
 @pytest.mark.skipif(
+    not torch.cuda.is_available(),
+    reason="CUDA required for VLM model with reasonable performance",
+)
+@pytest.mark.skipif(
     not _is_huggingface_logged_in(),
-    reason="Requires HuggingFace login (run: huggingface-cli login)"
+    reason="Requires HuggingFace login (run: huggingface-cli login)",
 )
 def test_vlm_loss_full_integration():
     """Full integration test with actual VLM model (requires network)."""
@@ -201,13 +213,16 @@ def test_vlm_loss_full_integration():
     # Create loss function
     vlm_loss = VLMLoss(
         prompt="warm golden hour",
+        model_name="gemma3_4b",
         device=device,
     )
 
     # Create test images
     batch_size = 2
     original = torch.rand(batch_size, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, device=device)
-    transformed = torch.rand(batch_size, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, device=device, requires_grad=True)
+    transformed = torch.rand(
+        batch_size, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, device=device, requires_grad=True
+    )
 
     # Compute loss
     loss = vlm_loss(transformed, original)
@@ -237,11 +252,11 @@ def test_vlm_loss_full_integration():
 
 @pytest.mark.skipif(
     not torch.cuda.is_available(),
-    reason="CUDA required for VLM model with reasonable performance"
+    reason="CUDA required for VLM model with reasonable performance",
 )
 @pytest.mark.skipif(
     not _is_huggingface_logged_in(),
-    reason="Requires HuggingFace login (run: huggingface-cli login)"
+    reason="Requires HuggingFace login (run: huggingface-cli login)",
 )
 def test_vlm_loss_cuda():
     """Test VLM loss on CUDA device."""
@@ -249,11 +264,15 @@ def test_vlm_loss_cuda():
     from utils.constants import VLM_IMAGE_SIZE
 
     device = "cuda"
-    vlm_loss = VLMLoss(prompt="cinematic lighting", device=device)
+    vlm_loss = VLMLoss(
+        prompt="cinematic lighting", device=device, model_name="gemma3_4b"
+    )
 
     batch_size = 1
     original = torch.rand(batch_size, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, device=device)
-    transformed = torch.rand(batch_size, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, device=device, requires_grad=True)
+    transformed = torch.rand(
+        batch_size, 3, VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, device=device, requires_grad=True
+    )
 
     loss = vlm_loss(transformed, original)
 
