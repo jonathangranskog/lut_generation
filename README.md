@@ -67,6 +67,14 @@ pytest -v
 
 It will skip the VLM tests if you are not logged in to huggingface or if CUDA is unavailable. 
 
+### 4. LUT library generation
+
+```bash
+python scripts/generate_luts.py --sample 100 --test-image images/IMG_0001.png --image-folder images --output-dir tmp/generated_luts/
+```
+
+This command generates 100 LUTs automatically using CLIP
+
 ## Commands
 
 ### `optimize` - Generate a LUT
