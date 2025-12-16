@@ -120,11 +120,9 @@ class TestVLMBinaryProbabilities:
         """Test loss computation from yes/no probabilities."""
         # Higher yes probability should give lower loss
         p_yes_high = torch.tensor([0.8])
-        p_no_high = torch.tensor([0.2])
 
         # Lower yes probability should give higher loss
         p_yes_low = torch.tensor([0.2])
-        p_no_low = torch.tensor([0.8])
 
         # Loss is typically -log(p_yes) or similar
         loss_high = -torch.log(p_yes_high)

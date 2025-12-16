@@ -1,13 +1,12 @@
 """Integration tests for complete LUT optimization and inference workflows."""
 
 import subprocess
-from pathlib import Path
 
 import pytest
 import torch
 
 from utils.io import read_cube_file
-from utils.transforms import apply_lut, identity_lut
+from utils.transforms import identity_lut
 
 
 @pytest.mark.integration

@@ -2,7 +2,6 @@
 Tests for ImageDataset class.
 """
 
-import os
 import pytest
 import torch
 from PIL import Image

@@ -36,7 +36,9 @@ def apply_saturation(lut: torch.Tensor, saturation_factor: float) -> torch.Tenso
     lut_flat = lut.reshape(-1, 3).permute(1, 0)  # (3, S*S*S)
 
     # Apply saturation adjustment
-    lut_adjusted = TF.adjust_saturation(lut_flat.unsqueeze(1), saturation_factor)  # (3, 1, S*S*S)
+    lut_adjusted = TF.adjust_saturation(
+        lut_flat.unsqueeze(1), saturation_factor
+    )  # (3, 1, S*S*S)
 
     # Reshape back to (S, S, S, 3)
     lut_result = lut_adjusted.squeeze(1).permute(1, 0).reshape(shape)
@@ -145,7 +147,7 @@ def apply_exposure(lut: torch.Tensor, exposure: float) -> torch.Tensor:
         exposure: Exposure adjustment in stops (-2.0 to 2.0)
     """
     # Convert stops to linear multiplier: 2^exposure
-    multiplier = 2.0 ** exposure
+    multiplier = 2.0**exposure
     result = lut * multiplier
 
     return result.clamp(0, 1)
@@ -192,9 +194,7 @@ def apply_tint(lut: torch.Tensor, tint: float) -> torch.Tensor:
 
 
 def apply_lut_to_test_image(
-    lut_tensor: torch.Tensor,
-    test_image_path: Path,
-    output_path: Path
+    lut_tensor: torch.Tensor, test_image_path: Path, output_path: Path
 ) -> None:
     """Apply a LUT to a test image and save the result."""
     try:
@@ -205,7 +205,7 @@ def apply_lut_to_test_image(
         result = apply_lut(image_tensor, lut_tensor)
 
         # Convert back to PIL and save
-        result_np = (result.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
+        result_np = (result.permute(1, 2, 0).cpu().numpy() * 255).astype("uint8")
         result_img = Image.fromarray(result_np)
         result_img.save(output_path)
 
@@ -221,7 +221,7 @@ def generate_utility_lut(
     lut_size: int = 32,
     grayscale: bool = False,
     test_image: Optional[Path] = None,
-    dry_run: bool = False
+    dry_run: bool = False,
 ) -> None:
     """Generate and save a single utility LUT."""
     # Create identity LUT
@@ -239,31 +239,47 @@ def generate_utility_lut(
         write_cube_file(
             str(output_path),
             lut_transformed,
-            title=name.replace('_', ' ').title(),
-            grayscale=grayscale
+            title=name.replace("_", " ").title(),
+            grayscale=grayscale,
         )
         print(f"Generated: {output_path}")
 
         # Apply to test image if provided
         if test_image:
-            test_output_path = output_path.with_suffix('.png')
+            test_output_path = output_path.with_suffix(".png")
             apply_lut_to_test_image(lut_transformed, test_image, test_output_path)
 
 
 @app.command()
 def main(
-    output_dir: Annotated[Path, typer.Option(help="Directory to save generated LUTs")] = Path("luts/utility"),
+    output_dir: Annotated[
+        Path, typer.Option(help="Directory to save generated LUTs")
+    ] = Path("luts/utility"),
     lut_size: Annotated[int, typer.Option(help="LUT resolution")] = 32,
-    saturation_only: Annotated[bool, typer.Option(help="Generate only saturation LUTs")] = False,
-    contrast_only: Annotated[bool, typer.Option(help="Generate only contrast LUTs")] = False,
-    brightness_only: Annotated[bool, typer.Option(help="Generate only brightness LUTs")] = False,
-    exposure_only: Annotated[bool, typer.Option(help="Generate only exposure LUTs")] = False,
+    saturation_only: Annotated[
+        bool, typer.Option(help="Generate only saturation LUTs")
+    ] = False,
+    contrast_only: Annotated[
+        bool, typer.Option(help="Generate only contrast LUTs")
+    ] = False,
+    brightness_only: Annotated[
+        bool, typer.Option(help="Generate only brightness LUTs")
+    ] = False,
+    exposure_only: Annotated[
+        bool, typer.Option(help="Generate only exposure LUTs")
+    ] = False,
     gamma_only: Annotated[bool, typer.Option(help="Generate only gamma LUTs")] = False,
     hue_only: Annotated[bool, typer.Option(help="Generate only hue LUTs")] = False,
-    temperature_only: Annotated[bool, typer.Option(help="Generate only temperature LUTs")] = False,
+    temperature_only: Annotated[
+        bool, typer.Option(help="Generate only temperature LUTs")
+    ] = False,
     tint_only: Annotated[bool, typer.Option(help="Generate only tint LUTs")] = False,
-    grayscale_only: Annotated[bool, typer.Option(help="Generate only grayscale LUTs")] = False,
-    test_image: Annotated[Optional[Path], typer.Option(help="Test image to apply each LUT to")] = None,
+    grayscale_only: Annotated[
+        bool, typer.Option(help="Generate only grayscale LUTs")
+    ] = False,
+    test_image: Annotated[
+        Optional[Path], typer.Option(help="Test image to apply each LUT to")
+    ] = None,
     dry_run: Annotated[bool, typer.Option(help="Preview without generating")] = False,
 ):
     """
@@ -283,107 +299,129 @@ def main(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine which categories to generate
-    generate_all = not any([
-        saturation_only, contrast_only, brightness_only,
-        exposure_only, gamma_only, hue_only,
-        temperature_only, tint_only, grayscale_only
-    ])
+    generate_all = not any(
+        [
+            saturation_only,
+            contrast_only,
+            brightness_only,
+            exposure_only,
+            gamma_only,
+            hue_only,
+            temperature_only,
+            tint_only,
+            grayscale_only,
+        ]
+    )
 
     luts_to_generate = []
 
     # Saturation LUTs
     if generate_all or saturation_only:
-        luts_to_generate.extend([
-            ("desaturate_25", lambda lut: apply_saturation(lut, 0.75)),
-            ("desaturate_50", lambda lut: apply_saturation(lut, 0.5)),
-            ("desaturate_75", lambda lut: apply_saturation(lut, 0.25)),
-            ("oversaturate_125", lambda lut: apply_saturation(lut, 1.25)),
-            ("oversaturate_150", lambda lut: apply_saturation(lut, 1.5)),
-            ("oversaturate_200", lambda lut: apply_saturation(lut, 2.0)),
-        ])
+        luts_to_generate.extend(
+            [
+                ("desaturate_25", lambda lut: apply_saturation(lut, 0.75)),
+                ("desaturate_50", lambda lut: apply_saturation(lut, 0.5)),
+                ("desaturate_75", lambda lut: apply_saturation(lut, 0.25)),
+                ("oversaturate_125", lambda lut: apply_saturation(lut, 1.25)),
+                ("oversaturate_150", lambda lut: apply_saturation(lut, 1.5)),
+                ("oversaturate_200", lambda lut: apply_saturation(lut, 2.0)),
+            ]
+        )
 
     # Contrast LUTs
     if generate_all or contrast_only:
-        luts_to_generate.extend([
-            ("low_contrast_50", lambda lut: apply_contrast(lut, 0.5)),
-            ("low_contrast_75", lambda lut: apply_contrast(lut, 0.75)),
-            ("high_contrast_125", lambda lut: apply_contrast(lut, 1.25)),
-            ("high_contrast_150", lambda lut: apply_contrast(lut, 1.5)),
-            ("high_contrast_200", lambda lut: apply_contrast(lut, 2.0)),
-        ])
+        luts_to_generate.extend(
+            [
+                ("low_contrast_50", lambda lut: apply_contrast(lut, 0.5)),
+                ("low_contrast_75", lambda lut: apply_contrast(lut, 0.75)),
+                ("high_contrast_125", lambda lut: apply_contrast(lut, 1.25)),
+                ("high_contrast_150", lambda lut: apply_contrast(lut, 1.5)),
+                ("high_contrast_200", lambda lut: apply_contrast(lut, 2.0)),
+            ]
+        )
 
     # Brightness LUTs
     if generate_all or brightness_only:
-        luts_to_generate.extend([
-            ("brightness_50", lambda lut: apply_brightness(lut, 0.5)),
-            ("brightness_75", lambda lut: apply_brightness(lut, 0.75)),
-            ("brightness_125", lambda lut: apply_brightness(lut, 1.25)),
-            ("brightness_150", lambda lut: apply_brightness(lut, 1.5)),
-            ("brightness_200", lambda lut: apply_brightness(lut, 2.0)),
-        ])
+        luts_to_generate.extend(
+            [
+                ("brightness_50", lambda lut: apply_brightness(lut, 0.5)),
+                ("brightness_75", lambda lut: apply_brightness(lut, 0.75)),
+                ("brightness_125", lambda lut: apply_brightness(lut, 1.25)),
+                ("brightness_150", lambda lut: apply_brightness(lut, 1.5)),
+                ("brightness_200", lambda lut: apply_brightness(lut, 2.0)),
+            ]
+        )
 
     # Exposure LUTs
     if generate_all or exposure_only:
-        luts_to_generate.extend([
-            ("exposure_minus_2", lambda lut: apply_exposure(lut, -2.0)),
-            ("exposure_minus_1", lambda lut: apply_exposure(lut, -1.0)),
-            ("exposure_minus_half", lambda lut: apply_exposure(lut, -0.5)),
-            ("exposure_plus_half", lambda lut: apply_exposure(lut, 0.5)),
-            ("exposure_plus_1", lambda lut: apply_exposure(lut, 1.0)),
-            ("exposure_plus_2", lambda lut: apply_exposure(lut, 2.0)),
-        ])
+        luts_to_generate.extend(
+            [
+                ("exposure_minus_2", lambda lut: apply_exposure(lut, -2.0)),
+                ("exposure_minus_1", lambda lut: apply_exposure(lut, -1.0)),
+                ("exposure_minus_half", lambda lut: apply_exposure(lut, -0.5)),
+                ("exposure_plus_half", lambda lut: apply_exposure(lut, 0.5)),
+                ("exposure_plus_1", lambda lut: apply_exposure(lut, 1.0)),
+                ("exposure_plus_2", lambda lut: apply_exposure(lut, 2.0)),
+            ]
+        )
 
     # Gamma LUTs
     if generate_all or gamma_only:
-        luts_to_generate.extend([
-            ("gamma_0_5", lambda lut: apply_gamma(lut, 0.5)),
-            ("gamma_0_75", lambda lut: apply_gamma(lut, 0.75)),
-            ("gamma_1_25", lambda lut: apply_gamma(lut, 1.25)),
-            ("gamma_1_5", lambda lut: apply_gamma(lut, 1.5)),
-            ("gamma_2_0", lambda lut: apply_gamma(lut, 2.0)),
-            ("gamma_2_2", lambda lut: apply_gamma(lut, 2.2)),  # sRGB standard
-        ])
+        luts_to_generate.extend(
+            [
+                ("gamma_0_5", lambda lut: apply_gamma(lut, 0.5)),
+                ("gamma_0_75", lambda lut: apply_gamma(lut, 0.75)),
+                ("gamma_1_25", lambda lut: apply_gamma(lut, 1.25)),
+                ("gamma_1_5", lambda lut: apply_gamma(lut, 1.5)),
+                ("gamma_2_0", lambda lut: apply_gamma(lut, 2.0)),
+                ("gamma_2_2", lambda lut: apply_gamma(lut, 2.2)),  # sRGB standard
+            ]
+        )
 
     # Hue shift LUTs (torchvision uses -0.5 to 0.5 range)
     if generate_all or hue_only:
-        luts_to_generate.extend([
-            ("hue_shift_30", lambda lut: apply_hue(lut, 30/360)),      # ~0.083
-            ("hue_shift_60", lambda lut: apply_hue(lut, 60/360)),      # ~0.167
-            ("hue_shift_90", lambda lut: apply_hue(lut, 90/360)),      # 0.25
-            ("hue_shift_120", lambda lut: apply_hue(lut, 120/360)),    # ~0.333
-            ("hue_shift_180", lambda lut: apply_hue(lut, 0.5)),        # 0.5 (max)
-            ("hue_shift_240", lambda lut: apply_hue(lut, -120/360)),   # ~-0.333
-            ("hue_shift_300", lambda lut: apply_hue(lut, -60/360)),    # ~-0.167
-        ])
+        luts_to_generate.extend(
+            [
+                ("hue_shift_30", lambda lut: apply_hue(lut, 30 / 360)),  # ~0.083
+                ("hue_shift_60", lambda lut: apply_hue(lut, 60 / 360)),  # ~0.167
+                ("hue_shift_90", lambda lut: apply_hue(lut, 90 / 360)),  # 0.25
+                ("hue_shift_120", lambda lut: apply_hue(lut, 120 / 360)),  # ~0.333
+                ("hue_shift_180", lambda lut: apply_hue(lut, 0.5)),  # 0.5 (max)
+                ("hue_shift_240", lambda lut: apply_hue(lut, -120 / 360)),  # ~-0.333
+                ("hue_shift_300", lambda lut: apply_hue(lut, -60 / 360)),  # ~-0.167
+            ]
+        )
 
     # Temperature LUTs
     if generate_all or temperature_only:
-        luts_to_generate.extend([
-            ("cool_slight", lambda lut: apply_temperature(lut, -0.3)),
-            ("cool_moderate", lambda lut: apply_temperature(lut, -0.6)),
-            ("cool_strong", lambda lut: apply_temperature(lut, -1.0)),
-            ("warm_slight", lambda lut: apply_temperature(lut, 0.3)),
-            ("warm_moderate", lambda lut: apply_temperature(lut, 0.6)),
-            ("warm_strong", lambda lut: apply_temperature(lut, 1.0)),
-        ])
+        luts_to_generate.extend(
+            [
+                ("cool_slight", lambda lut: apply_temperature(lut, -0.3)),
+                ("cool_moderate", lambda lut: apply_temperature(lut, -0.6)),
+                ("cool_strong", lambda lut: apply_temperature(lut, -1.0)),
+                ("warm_slight", lambda lut: apply_temperature(lut, 0.3)),
+                ("warm_moderate", lambda lut: apply_temperature(lut, 0.6)),
+                ("warm_strong", lambda lut: apply_temperature(lut, 1.0)),
+            ]
+        )
 
     # Tint LUTs
     if generate_all or tint_only:
-        luts_to_generate.extend([
-            ("tint_magenta_slight", lambda lut: apply_tint(lut, -0.3)),
-            ("tint_magenta_moderate", lambda lut: apply_tint(lut, -0.6)),
-            ("tint_magenta_strong", lambda lut: apply_tint(lut, -1.0)),
-            ("tint_green_slight", lambda lut: apply_tint(lut, 0.3)),
-            ("tint_green_moderate", lambda lut: apply_tint(lut, 0.6)),
-            ("tint_green_strong", lambda lut: apply_tint(lut, 1.0)),
-        ])
+        luts_to_generate.extend(
+            [
+                ("tint_magenta_slight", lambda lut: apply_tint(lut, -0.3)),
+                ("tint_magenta_moderate", lambda lut: apply_tint(lut, -0.6)),
+                ("tint_magenta_strong", lambda lut: apply_tint(lut, -1.0)),
+                ("tint_green_slight", lambda lut: apply_tint(lut, 0.3)),
+                ("tint_green_moderate", lambda lut: apply_tint(lut, 0.6)),
+                ("tint_green_strong", lambda lut: apply_tint(lut, 1.0)),
+            ]
+        )
 
     # Grayscale LUTs
     if generate_all or grayscale_only:
         # Grayscale using torchvision
-        luts_to_generate.append(
-            ("grayscale_rec709", lambda lut: apply_grayscale(lut))
-        )
+        luts_to_generate.append(("grayscale_rec709", lambda lut: apply_grayscale(lut)))
 
         # Also generate grayscale identity LUT
         print("\nGenerating grayscale identity LUT...")
@@ -394,7 +432,7 @@ def main(
             lut_size=lut_size,
             grayscale=True,
             test_image=test_image,
-            dry_run=dry_run
+            dry_run=dry_run,
         )
 
     # Generate all LUTs
@@ -409,15 +447,17 @@ def main(
             output_dir,
             lut_size=lut_size,
             test_image=test_image,
-            dry_run=dry_run
+            dry_run=dry_run,
         )
 
-    print(f"\n{'='*80}")
-    print(f"UTILITY LUT GENERATION COMPLETE")
-    print(f"{'='*80}")
-    print(f"Generated {len(luts_to_generate) + (1 if (generate_all or grayscale_only) else 0)} LUTs")
+    print(f"\n{'=' * 80}")
+    print("UTILITY LUT GENERATION COMPLETE")
+    print(f"{'=' * 80}")
+    print(
+        f"Generated {len(luts_to_generate) + (1 if (generate_all or grayscale_only) else 0)} LUTs"
+    )
     print(f"Output directory: {output_dir}")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
 
 if __name__ == "__main__":

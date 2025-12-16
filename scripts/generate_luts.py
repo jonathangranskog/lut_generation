@@ -11,7 +11,6 @@ import sys
 from pathlib import Path
 from typing import List, Tuple, Optional
 
-import torch
 import typer
 from PIL import Image
 from typing_extensions import Annotated
@@ -27,11 +26,11 @@ app = typer.Typer()
 
 def load_references(file_path: Path) -> List[str]:
     """Load non-comment, non-empty lines from a reference file."""
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         lines = [
             line.strip()
             for line in f
-            if line.strip() and not line.strip().startswith('#')
+            if line.strip() and not line.strip().startswith("#")
         ]
     return lines
 
@@ -40,7 +39,7 @@ def generate_color_prompts(
     colors: List[str],
     emotions: List[str],
     film_formats: List[str],
-    sample_size: int = None
+    sample_size: int = None,
 ) -> List[Tuple[str, bool]]:
     """
     Generate color LUT prompts with sensible combinations.
@@ -79,9 +78,7 @@ def generate_color_prompts(
 
 
 def generate_bw_prompts(
-    emotions: List[str],
-    film_formats_bw: List[str],
-    sample_size: int = None
+    emotions: List[str], film_formats_bw: List[str], sample_size: int = None
 ) -> List[Tuple[str, bool]]:
     """
     Generate black & white LUT prompts.
@@ -112,7 +109,7 @@ def generate_standalone_prompts(
     directors: List[str],
     movies_bw: List[str],
     directors_bw: List[str],
-    sample_size: int = None
+    sample_size: int = None,
 ) -> List[Tuple[str, bool]]:
     """
     Generate prompts from movies and directors (standalone only).
@@ -152,10 +149,12 @@ def parse_steps_range(steps_str: str) -> tuple[int, int]:
     Returns:
         Tuple of (min_steps, max_steps)
     """
-    if '-' in steps_str:
-        parts = steps_str.split('-')
+    if "-" in steps_str:
+        parts = steps_str.split("-")
         if len(parts) != 2:
-            raise ValueError(f"Invalid steps range format: {steps_str}. Expected 'min-max' or single integer")
+            raise ValueError(
+                f"Invalid steps range format: {steps_str}. Expected 'min-max' or single integer"
+            )
         min_steps, max_steps = int(parts[0]), int(parts[1])
         if min_steps > max_steps:
             raise ValueError(f"Invalid range: min ({min_steps}) > max ({max_steps})")
@@ -170,16 +169,14 @@ def sanitize_filename(prompt: str) -> str:
     """Convert prompt to a safe filename."""
     # Replace spaces with underscores, remove special chars
     safe = prompt.lower()
-    safe = safe.replace(' ', '_')
-    safe = ''.join(c for c in safe if c.isalnum() or c == '_')
+    safe = safe.replace(" ", "_")
+    safe = "".join(c for c in safe if c.isalnum() or c == "_")
     # Limit length
     return safe[:100]
 
 
 def apply_lut_to_test_image(
-    lut_path: Path,
-    test_image_path: Path,
-    output_path: Path
+    lut_path: Path, test_image_path: Path, output_path: Path
 ) -> None:
     """Apply a LUT to a test image and save the result."""
     try:
@@ -193,7 +190,7 @@ def apply_lut_to_test_image(
         result = apply_lut(image_tensor, lut_tensor, domain_min, domain_max)
 
         # Convert back to PIL and save
-        result_np = (result.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
+        result_np = (result.permute(1, 2, 0).cpu().numpy() * 255).astype("uint8")
         result_img = Image.fromarray(result_np)
         result_img.save(output_path)
 
@@ -213,7 +210,7 @@ def generate_lut(
     batch_size: int = 4,
     learning_rate: float = 0.005,
     test_image: Optional[Path] = None,
-    dry_run: bool = False
+    dry_run: bool = False,
 ) -> bool:
     """
     Generate a single LUT using main.py optimize command.
@@ -222,15 +219,25 @@ def generate_lut(
     output_path = output_dir / f"{sanitize_filename(prompt)}.cube"
 
     cmd = [
-        "python", "main.py", "optimize",
-        "--prompt", prompt,
-        "--image-folder", str(image_folder),
-        "--output-path", str(output_path),
-        "--model-type", model_type,
-        "--steps", str(steps),
-        "--lut-size", str(lut_size),
-        "--batch-size", str(batch_size),
-        "--learning-rate", str(learning_rate),
+        "python",
+        "main.py",
+        "optimize",
+        "--prompt",
+        prompt,
+        "--image-folder",
+        str(image_folder),
+        "--output-path",
+        str(output_path),
+        "--model-type",
+        model_type,
+        "--steps",
+        str(steps),
+        "--lut-size",
+        str(lut_size),
+        "--batch-size",
+        str(batch_size),
+        "--learning-rate",
+        str(learning_rate),
     ]
 
     if is_grayscale:
@@ -244,19 +251,19 @@ def generate_lut(
         print(f"[DRY RUN] Would run: {' '.join(cmd)}")
         return True
 
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"Generating LUT: {prompt}")
     print(f"Grayscale: {is_grayscale}")
     print(f"Steps: {steps}")
     print(f"Output: {output_path}")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
     try:
         subprocess.run(cmd, check=True)
 
         # Apply LUT to test image if provided
         if test_image and not dry_run:
-            test_output_path = output_path.with_suffix('.png')
+            test_output_path = output_path.with_suffix(".png")
             apply_lut_to_test_image(output_path, test_image, test_output_path)
 
         return True
@@ -267,22 +274,42 @@ def generate_lut(
 
 # This is the typer-based main() to replace argparse version in generate_luts.py
 
+
 @app.command()
 def main(
-    image_folder: Annotated[Path, typer.Option(help="Folder containing training images")],
-    output_dir: Annotated[Path, typer.Option(help="Directory to save generated LUTs")] = Path("luts"),
-    sample: Annotated[Optional[int], typer.Option(help="Random sample size (generates this many LUTs total)")] = None,
+    image_folder: Annotated[
+        Path, typer.Option(help="Folder containing training images")
+    ],
+    output_dir: Annotated[
+        Path, typer.Option(help="Directory to save generated LUTs")
+    ] = Path("luts"),
+    sample: Annotated[
+        Optional[int],
+        typer.Option(help="Random sample size (generates this many LUTs total)"),
+    ] = None,
     color_only: Annotated[bool, typer.Option(help="Generate only color LUTs")] = False,
-    bw_only: Annotated[bool, typer.Option(help="Generate only black & white LUTs")] = False,
-    standalone_only: Annotated[bool, typer.Option(help="Generate only standalone LUTs (movies and directors)")] = False,
+    bw_only: Annotated[
+        bool, typer.Option(help="Generate only black & white LUTs")
+    ] = False,
+    standalone_only: Annotated[
+        bool, typer.Option(help="Generate only standalone LUTs (movies and directors)")
+    ] = False,
     model_type: Annotated[str, typer.Option(help="Model to use")] = "clip",
     steps: Annotated[str, typer.Option(help="Training iterations per LUT")] = "200-600",
     lut_size: Annotated[int, typer.Option(help="LUT resolution")] = 16,
     batch_size: Annotated[Optional[int], typer.Option(help="Batch size")] = None,
-    learning_rate: Annotated[float, typer.Option(help="Learning rate for optimization")] = 0.005,
-    test_image: Annotated[Optional[Path], typer.Option(help="Test image to apply each LUT to")] = None,
-    seed: Annotated[Optional[int], typer.Option(help="Random seed for reproducible sampling")] = None,
-    dry_run: Annotated[bool, typer.Option(help="Print commands without executing")] = False,
+    learning_rate: Annotated[
+        float, typer.Option(help="Learning rate for optimization")
+    ] = 0.005,
+    test_image: Annotated[
+        Optional[Path], typer.Option(help="Test image to apply each LUT to")
+    ] = None,
+    seed: Annotated[
+        Optional[int], typer.Option(help="Random seed for reproducible sampling")
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option(help="Print commands without executing")
+    ] = False,
 ):
     """
     Batch generate LUTs from reference files.
@@ -326,7 +353,7 @@ def main(
     directors = load_references(prompts_dir / "directors.txt")
     directors_bw = load_references(prompts_dir / "directors_bw.txt")
 
-    print(f"Loaded references:")
+    print("Loaded references:")
     print(f"  Colors: {len(colors)}")
     print(f"  Emotions: {len(emotions)}")
     print(f"  Film formats (color): {len(film_formats)}")
@@ -390,7 +417,7 @@ def main(
             batch_size=batch_size,
             learning_rate=learning_rate,
             test_image=test_image,
-            dry_run=dry_run
+            dry_run=dry_run,
         )
 
         if success:
@@ -399,13 +426,13 @@ def main(
             failed += 1
 
     # Summary
-    print(f"\n{'='*80}")
-    print(f"BATCH GENERATION COMPLETE")
-    print(f"{'='*80}")
+    print(f"\n{'=' * 80}")
+    print("BATCH GENERATION COMPLETE")
+    print(f"{'=' * 80}")
     print(f"Successful: {successful}")
     print(f"Failed: {failed}")
     print(f"Output directory: {output_dir}")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
 
 if __name__ == "__main__":

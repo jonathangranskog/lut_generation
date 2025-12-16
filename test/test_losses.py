@@ -11,7 +11,6 @@ from utils.losses import (
     lut_smoothness_loss,
     compute_losses,
 )
-from utils.constants import REC709_LUMA_R, REC709_LUMA_G, REC709_LUMA_B
 
 
 class TestImageSmoothnessLoss:
