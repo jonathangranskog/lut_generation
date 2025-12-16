@@ -165,6 +165,7 @@ python scripts/generate_luts.py \
   - CLIP: 4 (default)
   - VLMs (Gemma) & SDS: 1 (memory-intensive models)
   - Can be overridden with explicit value
+- `--learning-rate FLOAT` - Learning rate for optimization (default: 0.005)
 
 #### Other
 - `--test-image PATH` - Test image for visualization:
