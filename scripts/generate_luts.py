@@ -351,8 +351,8 @@ Examples:
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=4,
-        help="Batch size (default: 4)"
+        default=None,
+        help="Batch size. If not specified, automatically set to 4 for CLIP, 1 for VLMs and SDS"
     )
 
     # Other options
@@ -385,6 +385,16 @@ Examples:
         print(f"Using fixed steps: {min_steps}")
     else:
         print(f"Using randomized steps: {min_steps}-{max_steps}")
+
+    # Auto-adjust batch size based on model type if not specified
+    if args.batch_size is None:
+        if args.model_type == "clip":
+            args.batch_size = 4
+        else:  # sds, gemma3_4b, gemma3_12b, gemma3_27b
+            args.batch_size = 1
+        print(f"Auto-set batch size to {args.batch_size} for {args.model_type}")
+    else:
+        print(f"Using user-specified batch size: {args.batch_size}")
 
     # Load reference files
     scripts_dir = Path(__file__).parent

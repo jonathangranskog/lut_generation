@@ -82,10 +82,10 @@ python scripts/generate_luts.py \
 
 #### Use a different model (VLM)
 ```bash
+# Batch size automatically set to 1 for VLM models
 python scripts/generate_luts.py \
   --image-folder images/ \
   --model-type gemma3_12b \
-  --batch-size 1 \
   --sample 50 \
   --output-dir luts/vlm/
 ```
@@ -154,7 +154,10 @@ python scripts/generate_luts.py \
   - Range: `--steps 200-600` (each LUT uses random steps in range)
   - Default: `200-600` (randomized for variety)
 - `--lut-size N` - LUT resolution (default: 16)
-- `--batch-size N` - Batch size (default: 4)
+- `--batch-size N` - Batch size. Auto-adjusts by model:
+  - CLIP: 4 (default)
+  - VLMs (Gemma) & SDS: 1 (memory-intensive models)
+  - Can be overridden with explicit value
 
 #### Other
 - `--test-image PATH` - Test image for visualization:
