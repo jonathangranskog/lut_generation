@@ -208,3 +208,121 @@ Avoid lines starting with `#` (treated as comments).
 Generated LUT files are automatically named based on the prompt:
 - Prompt: `"Kodak Portra 400 nostalgic"` → `kodak_portra_400_nostalgic.cube`
 - Prompt: `"Blade Runner 2049"` → `blade_runner_2049.cube`
+
+---
+
+## Utility LUT Generation Script
+
+The `generate_utility_luts.py` script creates technical adjustment LUTs using fixed mathematical transformations. Unlike AI-guided LUTs, these apply precise, predictable color adjustments.
+
+### Available Transformations
+
+**Saturation** (uses torchvision):
+- `desaturate_25`, `desaturate_50`, `desaturate_75`
+- `oversaturate_125`, `oversaturate_150`, `oversaturate_200`
+
+**Contrast** (uses torchvision):
+- `low_contrast_50`, `low_contrast_75`
+- `high_contrast_125`, `high_contrast_150`, `high_contrast_200`
+
+**Brightness** (uses torchvision):
+- `brightness_50`, `brightness_75`
+- `brightness_125`, `brightness_150`, `brightness_200`
+
+**Exposure** (stops):
+- `exposure_minus_2`, `exposure_minus_1`, `exposure_minus_half`
+- `exposure_plus_half`, `exposure_plus_1`, `exposure_plus_2`
+
+**Gamma**:
+- `gamma_0_5`, `gamma_0_75`, `gamma_1_25`
+- `gamma_1_5`, `gamma_2_0`, `gamma_2_2` (sRGB standard)
+
+**Hue Shift** (degrees, uses torchvision):
+- `hue_shift_30`, `hue_shift_60`, `hue_shift_90`
+- `hue_shift_120`, `hue_shift_180`, `hue_shift_240`, `hue_shift_300`
+
+**Temperature**:
+- `cool_slight`, `cool_moderate`, `cool_strong`
+- `warm_slight`, `warm_moderate`, `warm_strong`
+
+**Tint**:
+- `tint_magenta_slight`, `tint_magenta_moderate`, `tint_magenta_strong`
+- `tint_green_slight`, `tint_green_moderate`, `tint_green_strong`
+
+**Grayscale**:
+- `grayscale_rec709` (Rec. 709 luminance coefficients)
+- `grayscale_identity` (single-channel identity LUT)
+
+### Usage Examples
+
+#### Generate all utility LUTs
+```bash
+python scripts/generate_utility_luts.py --output-dir luts/utility/
+```
+
+#### Generate only saturation adjustments
+```bash
+python scripts/generate_utility_luts.py --saturation-only --output-dir luts/
+```
+
+#### Generate with high resolution
+```bash
+python scripts/generate_utility_luts.py --lut-size 64 --output-dir luts/utility/
+```
+
+#### Preview without generating
+```bash
+python scripts/generate_utility_luts.py --dry-run
+```
+
+### Command-Line Options
+
+```
+--output-dir PATH        Output directory (default: luts/utility/)
+--lut-size N            LUT resolution (default: 32)
+
+# Category filters (generate only specific types)
+--saturation-only
+--contrast-only
+--brightness-only
+--exposure-only
+--gamma-only
+--hue-only
+--temperature-only
+--tint-only
+--grayscale-only
+
+--dry-run               Preview without generating
+```
+
+### Use Cases
+
+**Quick technical adjustments:**
+- Apply `oversaturate_150.cube` for vibrant product photos
+- Use `gamma_2_2.cube` for sRGB gamma correction
+- Apply `cool_moderate.cube` for a subtle blue tone
+
+**Stacking LUTs:**
+Many video editing tools allow LUT stacking. Combine utility LUTs with AI-generated ones:
+1. Apply `exposure_plus_half.cube` to brighten
+2. Then apply `blade_runner_2049.cube` for the look
+3. Finally `desaturate_25.cube` to taste
+
+**Baseline corrections:**
+Use utility LUTs to prepare footage before applying creative LUTs:
+- `gamma_2_2.cube` for gamma standardization
+- `exposure_minus_1.cube` to bring down hot highlights
+- `warm_slight.cube` to counteract cool camera sensors
+
+### Total LUTs Generated
+
+Running with `--output-dir luts/utility/` generates **~43 utility LUTs**:
+- 6 saturation
+- 5 contrast
+- 5 brightness
+- 6 exposure
+- 6 gamma
+- 7 hue
+- 6 temperature
+- 6 tint
+- 2 grayscale
