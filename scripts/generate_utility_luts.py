@@ -4,9 +4,10 @@ Generate utility LUTs using fixed mathematical transformations.
 These are technical adjustment LUTs for common color operations.
 """
 
+import json
 import sys
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 
 import torch
 import torchvision.transforms.functional as TF
@@ -193,6 +194,29 @@ def apply_tint(lut: torch.Tensor, tint: float) -> torch.Tensor:
     return result.clamp(0, 1)
 
 
+def save_utility_lut_metadata(
+    output_path: Path,
+    lut_size: int,
+    grayscale: bool,
+    transformation_settings: Dict[str, Any],
+) -> None:
+    """Save metadata JSON file alongside a utility LUT."""
+    metadata: Dict[str, Any] = {
+        "utility": True,
+        "black_and_white": grayscale,
+        "settings": {
+            "lut_size": lut_size,
+            **transformation_settings,
+        },
+    }
+
+    metadata_path = output_path.with_suffix(".json")
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"  Saved metadata: {metadata_path}")
+
+
 def apply_lut_to_test_image(
     lut_tensor: torch.Tensor, test_image_path: Path, output_path: Path
 ) -> None:
@@ -222,6 +246,7 @@ def generate_utility_lut(
     grayscale: bool = False,
     test_image: Optional[Path] = None,
     dry_run: bool = False,
+    transformation_settings: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Generate and save a single utility LUT."""
     # Create identity LUT
@@ -243,6 +268,15 @@ def generate_utility_lut(
             grayscale=grayscale,
         )
         print(f"Generated: {output_path}")
+
+        # Save metadata
+        if transformation_settings:
+            save_utility_lut_metadata(
+                output_path=output_path,
+                lut_size=lut_size,
+                grayscale=grayscale,
+                transformation_settings=transformation_settings,
+            )
 
         # Apply to test image if provided
         if test_image:
@@ -319,12 +353,36 @@ def main(
     if generate_all or saturation_only:
         luts_to_generate.extend(
             [
-                ("desaturate_25", lambda lut: apply_saturation(lut, 0.75)),
-                ("desaturate_50", lambda lut: apply_saturation(lut, 0.5)),
-                ("desaturate_75", lambda lut: apply_saturation(lut, 0.25)),
-                ("oversaturate_125", lambda lut: apply_saturation(lut, 1.25)),
-                ("oversaturate_150", lambda lut: apply_saturation(lut, 1.5)),
-                ("oversaturate_200", lambda lut: apply_saturation(lut, 2.0)),
+                (
+                    "desaturate_25",
+                    lambda lut: apply_saturation(lut, 0.75),
+                    {"transformation": "saturation", "saturation_factor": 0.75},
+                ),
+                (
+                    "desaturate_50",
+                    lambda lut: apply_saturation(lut, 0.5),
+                    {"transformation": "saturation", "saturation_factor": 0.5},
+                ),
+                (
+                    "desaturate_75",
+                    lambda lut: apply_saturation(lut, 0.25),
+                    {"transformation": "saturation", "saturation_factor": 0.25},
+                ),
+                (
+                    "oversaturate_125",
+                    lambda lut: apply_saturation(lut, 1.25),
+                    {"transformation": "saturation", "saturation_factor": 1.25},
+                ),
+                (
+                    "oversaturate_150",
+                    lambda lut: apply_saturation(lut, 1.5),
+                    {"transformation": "saturation", "saturation_factor": 1.5},
+                ),
+                (
+                    "oversaturate_200",
+                    lambda lut: apply_saturation(lut, 2.0),
+                    {"transformation": "saturation", "saturation_factor": 2.0},
+                ),
             ]
         )
 
@@ -332,11 +390,31 @@ def main(
     if generate_all or contrast_only:
         luts_to_generate.extend(
             [
-                ("low_contrast_50", lambda lut: apply_contrast(lut, 0.5)),
-                ("low_contrast_75", lambda lut: apply_contrast(lut, 0.75)),
-                ("high_contrast_125", lambda lut: apply_contrast(lut, 1.25)),
-                ("high_contrast_150", lambda lut: apply_contrast(lut, 1.5)),
-                ("high_contrast_200", lambda lut: apply_contrast(lut, 2.0)),
+                (
+                    "low_contrast_50",
+                    lambda lut: apply_contrast(lut, 0.5),
+                    {"transformation": "contrast", "contrast_factor": 0.5},
+                ),
+                (
+                    "low_contrast_75",
+                    lambda lut: apply_contrast(lut, 0.75),
+                    {"transformation": "contrast", "contrast_factor": 0.75},
+                ),
+                (
+                    "high_contrast_125",
+                    lambda lut: apply_contrast(lut, 1.25),
+                    {"transformation": "contrast", "contrast_factor": 1.25},
+                ),
+                (
+                    "high_contrast_150",
+                    lambda lut: apply_contrast(lut, 1.5),
+                    {"transformation": "contrast", "contrast_factor": 1.5},
+                ),
+                (
+                    "high_contrast_200",
+                    lambda lut: apply_contrast(lut, 2.0),
+                    {"transformation": "contrast", "contrast_factor": 2.0},
+                ),
             ]
         )
 
@@ -344,11 +422,31 @@ def main(
     if generate_all or brightness_only:
         luts_to_generate.extend(
             [
-                ("brightness_50", lambda lut: apply_brightness(lut, 0.5)),
-                ("brightness_75", lambda lut: apply_brightness(lut, 0.75)),
-                ("brightness_125", lambda lut: apply_brightness(lut, 1.25)),
-                ("brightness_150", lambda lut: apply_brightness(lut, 1.5)),
-                ("brightness_200", lambda lut: apply_brightness(lut, 2.0)),
+                (
+                    "brightness_50",
+                    lambda lut: apply_brightness(lut, 0.5),
+                    {"transformation": "brightness", "brightness_factor": 0.5},
+                ),
+                (
+                    "brightness_75",
+                    lambda lut: apply_brightness(lut, 0.75),
+                    {"transformation": "brightness", "brightness_factor": 0.75},
+                ),
+                (
+                    "brightness_125",
+                    lambda lut: apply_brightness(lut, 1.25),
+                    {"transformation": "brightness", "brightness_factor": 1.25},
+                ),
+                (
+                    "brightness_150",
+                    lambda lut: apply_brightness(lut, 1.5),
+                    {"transformation": "brightness", "brightness_factor": 1.5},
+                ),
+                (
+                    "brightness_200",
+                    lambda lut: apply_brightness(lut, 2.0),
+                    {"transformation": "brightness", "brightness_factor": 2.0},
+                ),
             ]
         )
 
@@ -356,12 +454,36 @@ def main(
     if generate_all or exposure_only:
         luts_to_generate.extend(
             [
-                ("exposure_minus_2", lambda lut: apply_exposure(lut, -2.0)),
-                ("exposure_minus_1", lambda lut: apply_exposure(lut, -1.0)),
-                ("exposure_minus_half", lambda lut: apply_exposure(lut, -0.5)),
-                ("exposure_plus_half", lambda lut: apply_exposure(lut, 0.5)),
-                ("exposure_plus_1", lambda lut: apply_exposure(lut, 1.0)),
-                ("exposure_plus_2", lambda lut: apply_exposure(lut, 2.0)),
+                (
+                    "exposure_minus_2",
+                    lambda lut: apply_exposure(lut, -2.0),
+                    {"transformation": "exposure", "exposure_stops": -2.0},
+                ),
+                (
+                    "exposure_minus_1",
+                    lambda lut: apply_exposure(lut, -1.0),
+                    {"transformation": "exposure", "exposure_stops": -1.0},
+                ),
+                (
+                    "exposure_minus_half",
+                    lambda lut: apply_exposure(lut, -0.5),
+                    {"transformation": "exposure", "exposure_stops": -0.5},
+                ),
+                (
+                    "exposure_plus_half",
+                    lambda lut: apply_exposure(lut, 0.5),
+                    {"transformation": "exposure", "exposure_stops": 0.5},
+                ),
+                (
+                    "exposure_plus_1",
+                    lambda lut: apply_exposure(lut, 1.0),
+                    {"transformation": "exposure", "exposure_stops": 1.0},
+                ),
+                (
+                    "exposure_plus_2",
+                    lambda lut: apply_exposure(lut, 2.0),
+                    {"transformation": "exposure", "exposure_stops": 2.0},
+                ),
             ]
         )
 
@@ -369,12 +491,36 @@ def main(
     if generate_all or gamma_only:
         luts_to_generate.extend(
             [
-                ("gamma_0_5", lambda lut: apply_gamma(lut, 0.5)),
-                ("gamma_0_75", lambda lut: apply_gamma(lut, 0.75)),
-                ("gamma_1_25", lambda lut: apply_gamma(lut, 1.25)),
-                ("gamma_1_5", lambda lut: apply_gamma(lut, 1.5)),
-                ("gamma_2_0", lambda lut: apply_gamma(lut, 2.0)),
-                ("gamma_2_2", lambda lut: apply_gamma(lut, 2.2)),  # sRGB standard
+                (
+                    "gamma_0_5",
+                    lambda lut: apply_gamma(lut, 0.5),
+                    {"transformation": "gamma", "gamma": 0.5, "gain": 1.0},
+                ),
+                (
+                    "gamma_0_75",
+                    lambda lut: apply_gamma(lut, 0.75),
+                    {"transformation": "gamma", "gamma": 0.75, "gain": 1.0},
+                ),
+                (
+                    "gamma_1_25",
+                    lambda lut: apply_gamma(lut, 1.25),
+                    {"transformation": "gamma", "gamma": 1.25, "gain": 1.0},
+                ),
+                (
+                    "gamma_1_5",
+                    lambda lut: apply_gamma(lut, 1.5),
+                    {"transformation": "gamma", "gamma": 1.5, "gain": 1.0},
+                ),
+                (
+                    "gamma_2_0",
+                    lambda lut: apply_gamma(lut, 2.0),
+                    {"transformation": "gamma", "gamma": 2.0, "gain": 1.0},
+                ),
+                (
+                    "gamma_2_2",
+                    lambda lut: apply_gamma(lut, 2.2),
+                    {"transformation": "gamma", "gamma": 2.2, "gain": 1.0},
+                ),  # sRGB standard
             ]
         )
 
@@ -382,13 +528,41 @@ def main(
     if generate_all or hue_only:
         luts_to_generate.extend(
             [
-                ("hue_shift_30", lambda lut: apply_hue(lut, 30 / 360)),  # ~0.083
-                ("hue_shift_60", lambda lut: apply_hue(lut, 60 / 360)),  # ~0.167
-                ("hue_shift_90", lambda lut: apply_hue(lut, 90 / 360)),  # 0.25
-                ("hue_shift_120", lambda lut: apply_hue(lut, 120 / 360)),  # ~0.333
-                ("hue_shift_180", lambda lut: apply_hue(lut, 0.5)),  # 0.5 (max)
-                ("hue_shift_240", lambda lut: apply_hue(lut, -120 / 360)),  # ~-0.333
-                ("hue_shift_300", lambda lut: apply_hue(lut, -60 / 360)),  # ~-0.167
+                (
+                    "hue_shift_30",
+                    lambda lut: apply_hue(lut, 30 / 360),
+                    {"transformation": "hue", "hue_shift_degrees": 30},
+                ),
+                (
+                    "hue_shift_60",
+                    lambda lut: apply_hue(lut, 60 / 360),
+                    {"transformation": "hue", "hue_shift_degrees": 60},
+                ),
+                (
+                    "hue_shift_90",
+                    lambda lut: apply_hue(lut, 90 / 360),
+                    {"transformation": "hue", "hue_shift_degrees": 90},
+                ),
+                (
+                    "hue_shift_120",
+                    lambda lut: apply_hue(lut, 120 / 360),
+                    {"transformation": "hue", "hue_shift_degrees": 120},
+                ),
+                (
+                    "hue_shift_180",
+                    lambda lut: apply_hue(lut, 0.5),
+                    {"transformation": "hue", "hue_shift_degrees": 180},
+                ),
+                (
+                    "hue_shift_240",
+                    lambda lut: apply_hue(lut, -120 / 360),
+                    {"transformation": "hue", "hue_shift_degrees": 240},
+                ),
+                (
+                    "hue_shift_300",
+                    lambda lut: apply_hue(lut, -60 / 360),
+                    {"transformation": "hue", "hue_shift_degrees": 300},
+                ),
             ]
         )
 
@@ -396,12 +570,36 @@ def main(
     if generate_all or temperature_only:
         luts_to_generate.extend(
             [
-                ("cool_slight", lambda lut: apply_temperature(lut, -0.3)),
-                ("cool_moderate", lambda lut: apply_temperature(lut, -0.6)),
-                ("cool_strong", lambda lut: apply_temperature(lut, -1.0)),
-                ("warm_slight", lambda lut: apply_temperature(lut, 0.3)),
-                ("warm_moderate", lambda lut: apply_temperature(lut, 0.6)),
-                ("warm_strong", lambda lut: apply_temperature(lut, 1.0)),
+                (
+                    "cool_slight",
+                    lambda lut: apply_temperature(lut, -0.3),
+                    {"transformation": "temperature", "temperature": -0.3},
+                ),
+                (
+                    "cool_moderate",
+                    lambda lut: apply_temperature(lut, -0.6),
+                    {"transformation": "temperature", "temperature": -0.6},
+                ),
+                (
+                    "cool_strong",
+                    lambda lut: apply_temperature(lut, -1.0),
+                    {"transformation": "temperature", "temperature": -1.0},
+                ),
+                (
+                    "warm_slight",
+                    lambda lut: apply_temperature(lut, 0.3),
+                    {"transformation": "temperature", "temperature": 0.3},
+                ),
+                (
+                    "warm_moderate",
+                    lambda lut: apply_temperature(lut, 0.6),
+                    {"transformation": "temperature", "temperature": 0.6},
+                ),
+                (
+                    "warm_strong",
+                    lambda lut: apply_temperature(lut, 1.0),
+                    {"transformation": "temperature", "temperature": 1.0},
+                ),
             ]
         )
 
@@ -409,19 +607,49 @@ def main(
     if generate_all or tint_only:
         luts_to_generate.extend(
             [
-                ("tint_magenta_slight", lambda lut: apply_tint(lut, -0.3)),
-                ("tint_magenta_moderate", lambda lut: apply_tint(lut, -0.6)),
-                ("tint_magenta_strong", lambda lut: apply_tint(lut, -1.0)),
-                ("tint_green_slight", lambda lut: apply_tint(lut, 0.3)),
-                ("tint_green_moderate", lambda lut: apply_tint(lut, 0.6)),
-                ("tint_green_strong", lambda lut: apply_tint(lut, 1.0)),
+                (
+                    "tint_magenta_slight",
+                    lambda lut: apply_tint(lut, -0.3),
+                    {"transformation": "tint", "tint": -0.3},
+                ),
+                (
+                    "tint_magenta_moderate",
+                    lambda lut: apply_tint(lut, -0.6),
+                    {"transformation": "tint", "tint": -0.6},
+                ),
+                (
+                    "tint_magenta_strong",
+                    lambda lut: apply_tint(lut, -1.0),
+                    {"transformation": "tint", "tint": -1.0},
+                ),
+                (
+                    "tint_green_slight",
+                    lambda lut: apply_tint(lut, 0.3),
+                    {"transformation": "tint", "tint": 0.3},
+                ),
+                (
+                    "tint_green_moderate",
+                    lambda lut: apply_tint(lut, 0.6),
+                    {"transformation": "tint", "tint": 0.6},
+                ),
+                (
+                    "tint_green_strong",
+                    lambda lut: apply_tint(lut, 1.0),
+                    {"transformation": "tint", "tint": 1.0},
+                ),
             ]
         )
 
     # Grayscale LUTs
     if generate_all or grayscale_only:
         # Grayscale using torchvision
-        luts_to_generate.append(("grayscale_rec709", lambda lut: apply_grayscale(lut)))
+        luts_to_generate.append(
+            (
+                "grayscale_rec709",
+                lambda lut: apply_grayscale(lut),
+                {"transformation": "grayscale", "method": "rec709"},
+            )
+        )
 
         # Also generate grayscale identity LUT
         print("\nGenerating grayscale identity LUT...")
@@ -433,6 +661,7 @@ def main(
             grayscale=True,
             test_image=test_image,
             dry_run=dry_run,
+            transformation_settings={"transformation": "identity"},
         )
 
     # Generate all LUTs
@@ -440,7 +669,7 @@ def main(
     print(f"Output directory: {output_dir}")
     print(f"LUT size: {lut_size}\n")
 
-    for name, transform_fn in luts_to_generate:
+    for name, transform_fn, metadata in luts_to_generate:
         generate_utility_lut(
             name,
             transform_fn,
@@ -448,6 +677,7 @@ def main(
             lut_size=lut_size,
             test_image=test_image,
             dry_run=dry_run,
+            transformation_settings=metadata,
         )
 
     print(f"\n{'=' * 80}")
