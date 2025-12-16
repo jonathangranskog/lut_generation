@@ -397,16 +397,16 @@ Examples:
         print(f"Using user-specified batch size: {args.batch_size}")
 
     # Load reference files
-    scripts_dir = Path(__file__).parent
+    prompts_dir = Path(__file__).parent / "prompts"
 
-    colors = load_references(scripts_dir / "colors.txt")
-    emotions = load_references(scripts_dir / "emotions.txt")
-    film_formats = load_references(scripts_dir / "film_formats.txt")
-    film_formats_bw = load_references(scripts_dir / "film_formats_bw.txt")
-    movies = load_references(scripts_dir / "movies.txt")
-    movies_bw = load_references(scripts_dir / "movies_bw.txt")
-    directors = load_references(scripts_dir / "directors.txt")
-    directors_bw = load_references(scripts_dir / "directors_bw.txt")
+    colors = load_references(prompts_dir / "colors.txt")
+    emotions = load_references(prompts_dir / "emotions.txt")
+    film_formats = load_references(prompts_dir / "film_formats.txt")
+    film_formats_bw = load_references(prompts_dir / "film_formats_bw.txt")
+    movies = load_references(prompts_dir / "movies.txt")
+    movies_bw = load_references(prompts_dir / "movies_bw.txt")
+    directors = load_references(prompts_dir / "directors.txt")
+    directors_bw = load_references(prompts_dir / "directors_bw.txt")
 
     print(f"Loaded references:")
     print(f"  Colors: {len(colors)}")

@@ -1,8 +1,15 @@
 # LUT Generation Scripts
 
-This folder contains reference files and batch generation tools for creating large libraries of LUTs.
+This folder contains batch generation tools and reference prompt files for creating large libraries of LUTs.
 
-## Reference Files
+## Folder Structure
+
+- `generate_luts.py` - AI-guided batch LUT generation
+- `generate_utility_luts.py` - Fixed transformation utility LUTs
+- `prompts/` - Reference files for prompt generation
+- `README.md` - This documentation
+
+## Reference Files (in `prompts/`)
 
 ### Color LUTs
 - **colors.txt** - 100+ colors, combinations, and qualities
@@ -259,12 +266,12 @@ python scripts/generate_luts.py \
 
 ## Adding Custom References
 
-To expand the library, simply add new lines to any `.txt` file:
+To expand the library, simply add new lines to any `.txt` file in `prompts/`:
 
 ```bash
-echo "sunset orange glow" >> scripts/colors.txt
-echo "Kodak Vision3 5219" >> scripts/film_formats.txt
-echo "euphoric neon dreamscape" >> scripts/emotions.txt
+echo "sunset orange glow" >> scripts/prompts/colors.txt
+echo "Kodak Vision3 5219" >> scripts/prompts/film_formats.txt
+echo "euphoric neon dreamscape" >> scripts/prompts/emotions.txt
 ```
 
 Avoid lines starting with `#` (treated as comments).
