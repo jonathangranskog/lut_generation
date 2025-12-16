@@ -275,6 +275,9 @@ def main(
 
       # Generate only saturation LUTs
       python scripts/generate_utility_luts.py --saturation-only --output-dir luts/
+
+      # Generate with test image preview
+      python scripts/generate_utility_luts.py --output-dir luts/utility/ --test-image images/test.jpg
     """
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
