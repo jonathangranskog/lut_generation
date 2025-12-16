@@ -373,7 +373,7 @@ def optimize(
     domain_max = [1.0, 1.0, 1.0]
     write_cube_file(
         output_path,
-        lut_tensor.detach().cpu(),
+        postprocess_lut(lut_tensor).detach().cpu(),
         domain_min,
         domain_max,
         title=f"{model_type.upper()}: {prompt}",

@@ -1,0 +1,72 @@
+# Directors Known for Black and White Work
+# Filmmakers with distinctive monochrome visual styles
+# For use with --grayscale flag
+
+# Classic Masters
+Orson Welles (noir contrast)
+Alfred Hitchcock (suspense shadows)
+Billy Wilder (sophisticated noir)
+Fritz Lang (expressionist darkness)
+F.W. Murnau (silent era shadows)
+Robert Wiene (Caligari angles)
+
+# Foreign Auteurs
+Ingmar Bergman (stark Swedish)
+Federico Fellini (dreamlike Italian)
+Akira Kurosawa (dynamic Japanese)
+Yasujiro Ozu (contemplative frames)
+Jean-Luc Godard (French New Wave)
+François Truffaut (nouvelle vague)
+Vittorio De Sica (neorealist)
+Andrei Tarkovsky (poetic Russian)
+
+# Film Noir Specialists
+Billy Wilder (noir master)
+Otto Preminger (dark noir)
+Robert Siodmak (German noir)
+Jacques Tourneur (atmospheric noir)
+Anthony Mann (western noir)
+Samuel Fuller (gritty noir)
+
+# Modern Practitioners
+Steven Spielberg (Schindler's List)
+Alfonso Cuarón (Roma)
+Robert Eggers (The Lighthouse)
+Darren Aronofsky (Pi)
+Jim Jarmusch (Dead Man)
+David Lynch (Eraserhead)
+Pawel Pawlikowski (Ida, Cold War)
+Noah Baumbach (Frances Ha)
+Michel Hazanavicius (The Artist)
+Alexander Payne (Nebraska)
+Woody Allen (Manhattan)
+
+# Documentary and Realism
+Frederick Wiseman (documentary)
+Ken Burns (archival)
+Chris Marker (essay films)
+
+# Horror in B&W
+Robert Eggers (The Lighthouse)
+David Lynch (Eraserhead)
+Carl Theodor Dreyer (Vampyr)
+Georges Franju (Eyes Without a Face)
+
+# Avant-Garde
+Maya Deren (experimental)
+Stan Brakhage (abstract)
+Dziga Vertov (Soviet montage)
+
+# Visual Style Descriptors
+deep shadow noir style
+high contrast Wellesian
+soft focus Bergman
+handheld Godard
+neorealist documentary
+expressionist shadows
+chiaroscuro lighting
+minimalist stark
+dramatic noir
+contemplative quiet
+gritty street
+elegant sophisticated

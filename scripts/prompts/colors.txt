@@ -1,0 +1,143 @@
+# Color Reference Library for LUT Generation
+# Approximately 100+ distinct colors and color combinations
+
+# Primary and Secondary Colors
+red
+blue
+green
+yellow
+cyan
+magenta
+orange
+purple
+violet
+indigo
+
+# Warm Colors
+crimson
+scarlet
+vermillion
+coral
+salmon
+peach
+apricot
+tangerine
+amber
+gold
+honey
+saffron
+ochre
+sienna
+burnt orange
+terracotta
+rust
+copper
+bronze
+
+# Cool Colors
+navy
+cobalt
+azure
+cerulean
+turquoise
+teal
+aquamarine
+seafoam
+mint
+jade
+emerald
+forest green
+olive
+sage
+lime
+chartreuse
+
+# Purples and Pinks
+lavender
+lilac
+mauve
+plum
+burgundy
+maroon
+rose
+pink
+fuchsia
+magenta
+hot pink
+blush
+dusty rose
+
+# Neutrals and Earth Tones
+ivory
+cream
+beige
+tan
+taupe
+khaki
+sand
+camel
+umber
+sepia
+chocolate
+coffee
+mocha
+espresso
+charcoal
+slate
+ash
+smoke
+pewter
+
+# Blacks and Whites
+white
+off-white
+eggshell
+pearl
+snow
+alabaster
+black
+jet black
+obsidian
+onyx
+ebony
+
+# Metallics
+silver
+platinum
+titanium
+chrome
+steel
+brass
+gold leaf
+rose gold
+gunmetal
+
+# Complex Color Descriptions
+teal and orange
+blue and yellow
+red and cyan
+complementary colors
+warm and cool contrast
+desaturated pastels
+vibrant neons
+muted earth tones
+monochromatic blues
+analogous warm tones
+split complementary
+triadic harmony
+
+# Color Qualities
+deep saturated
+pale washed out
+vivid bright
+muted subdued
+rich luxurious
+soft gentle
+bold striking
+delicate subtle
+earthy organic
+jewel tones
+candy colors
+ice cream pastels
+autumn leaves
+spring blossoms

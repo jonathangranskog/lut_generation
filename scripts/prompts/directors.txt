@@ -1,0 +1,94 @@
+# Directors with Distinctive Visual Styles
+# Filmmakers known for consistent and recognizable color grading and aesthetics
+
+# Contemporary Auteurs
+Wes Anderson (pastel symmetrical)
+Roger Deakins (naturalistic master)
+Emmanuel Lubezki (flowing natural light)
+Christopher Nolan (cool desaturated)
+Denis Villeneuve (atmospheric mystery)
+David Fincher (teal and yellow)
+Paul Thomas Anderson (warm analog)
+Terrence Malick (golden magic hour)
+Alfonso Cuaron (immersive long takes)
+Alejandro Inarritu (gritty realism)
+
+# Genre Masters
+Ridley Scott (atmospheric epic)
+Steven Spielberg (warm blockbuster)
+James Cameron (blue futurism)
+Quentin Tarantino (saturated pulp)
+Martin Scorsese (rich texture)
+Coen Brothers (varied precision)
+Wong Kar-wai (neon romance)
+Park Chan-wook (vengeance red)
+Bong Joon-ho (genre fluidity)
+Guillermo del Toro (dark fairy tale)
+
+# Visual Stylists
+Nicolas Winding Refn (neon brutalism)
+Lars von Trier (provocative contrast)
+Gaspar Noe (psychedelic intensity)
+Dario Argento (giallo primary)
+Yorgos Lanthimos (sterile absurdism)
+Ari Aster (bright horror)
+Robert Eggers (period authenticity)
+Andrea Arnold (handheld naturalism)
+Steve McQueen (artistic realism)
+Barry Jenkins (poetic intimacy)
+
+# Classic Masters
+Stanley Kubrick (precise composition)
+Alfred Hitchcock (suspense master)
+Akira Kurosawa (dynamic composition)
+Ingmar Bergman (stark contrast)
+Federico Fellini (surreal dreamlike)
+Andrei Tarkovsky (poetic long takes)
+Orson Welles (deep focus noir)
+Sergio Leone (operatic western)
+
+# Modern Visionaries
+Jordan Peele (uncanny suburbia)
+Robert Rodriguez (saturated action)
+Zack Snyder (desaturated epic)
+J.J. Abrams (lens flare spectacle)
+Michael Mann (digital nightscapes)
+Danny Boyle (kinetic energy)
+Darren Aronofsky (intimate intensity)
+Spike Jonze (whimsical melancholy)
+Sofia Coppola (dreamy pastels)
+Kelly Reichardt (minimalist americana)
+
+# International Vision
+Pedro Almodovar (vibrant melodrama)
+Jean-Pierre Jeunet (whimsical French)
+Luca Guadagnino (sensual Italian)
+Celine Sciamma (intimate portraiture)
+Lucrecia Martel (humid atmosphere)
+Apichatpong Weerasethakul (dreamy Thai)
+Hirokazu Kore-eda (gentle Japanese)
+Ryusuke Hamaguchi (contemplative frames)
+
+# Action and Blockbuster
+Michael Bay (teal orange explosion)
+Zack Snyder (desaturated slow-mo)
+Russo Brothers (modern action)
+Chad Stahelski (neon choreography)
+George Miller (kinetic color)
+Denis Villeneuve (epic scale)
+
+# Horror Specialists
+Ari Aster (daylight dread)
+Robert Eggers (period darkness)
+Jordan Peele (sunny uncanny)
+Mike Flanagan (gothic atmosphere)
+Ti West (retro horror)
+Julia Ducournau (visceral body)
+
+# Independent Voices
+Greta Gerwig (warm nostalgia)
+Noah Baumbach (urban neurotic)
+Lynne Ramsay (visceral subjective)
+Chloe Zhao (magic hour americana)
+Barry Jenkins (lyrical realism)
+Sean Baker (iPhone cinema)

@@ -1,0 +1,66 @@
+# Black and White Film Formats
+# For use with --grayscale flag
+
+# Classic B&W Films
+Kodak Tri-X 400
+Kodak T-Max 100
+Kodak T-Max 400
+Kodak T-Max 3200
+Kodak Plus-X
+Kodak Double-X
+Ilford HP5 Plus
+Ilford Delta 100
+Ilford Delta 400
+Ilford Delta 3200
+Ilford FP4 Plus
+Ilford Pan F Plus 50
+Ilford XP2 Super
+Fomapan 100
+Fomapan 200
+Fomapan 400
+Rollei RPX 25
+Rollei RPX 100
+Rollei RPX 400
+Agfa APX 100
+Agfa APX 400
+
+# B&W Characteristics
+fine grain black and white
+heavy grain noir
+high contrast monochrome
+low contrast grayscale
+pushed black and white
+pulled black and white
+rich blacks deep shadows
+soft gray tones
+dramatic contrast
+subtle gradation
+silver gelatin print
+selenium toned
+sepia toned (for warmth reference)
+cold tone blue-black
+warm tone brown-black
+neutral gray
+fog and haze gray
+overexposed ethereal
+underexposed moody
+zone system perfection
+
+# B&W Cinematic Stocks
+Eastman Double-X 5222
+Kodak Vision3 (desaturated reference)
+16mm black and white
+35mm monochrome
+documentary black and white
+newsreel footage
+archival film grain
+
+# Specialty B&W
+infrared black and white
+orthochromatic film
+panchromatic film
+reversal black and white
+chromogenic black and white
+instant black and white
+Polaroid Type 55
+Polaroid Type 665
