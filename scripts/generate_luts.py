@@ -230,6 +230,10 @@ def generate_lut(
     if is_grayscale:
         cmd.append("--grayscale")
 
+    # Pass test image to optimization for training visualization
+    if test_image:
+        cmd.extend(["--test-image", str(test_image)])
+
     if dry_run:
         print(f"[DRY RUN] Would run: {' '.join(cmd)}")
         return True

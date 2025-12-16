@@ -92,7 +92,9 @@ python scripts/generate_luts.py \
 
 #### Generate with test image preview
 ```bash
-# Applies each LUT to test.jpg and saves result as .png
+# Uses test.jpg for:
+# 1. Training visualization (logged during optimization)
+# 2. Final result preview (saved as .png alongside .cube)
 python scripts/generate_luts.py \
   --image-folder images/ \
   --sample 50 \
@@ -155,7 +157,9 @@ python scripts/generate_luts.py \
 - `--batch-size N` - Batch size (default: 4)
 
 #### Other
-- `--test-image PATH` - Test image to apply each LUT to (saves .png alongside .cube file)
+- `--test-image PATH` - Test image for visualization:
+  - Passed to optimizer for training progress logs
+  - Applied to final LUT and saved as .png alongside .cube
 - `--dry-run` - Preview without generating
 - `--seed N` - Random seed for reproducibility
 
