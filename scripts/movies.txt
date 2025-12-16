@@ -1,0 +1,111 @@
+# Famous Movies with Iconic Color Grades
+# Films known for distinctive and influential color grading
+
+# Modern Blockbusters
+The Matrix (green tint)
+Mad Max Fury Road (orange and teal)
+Blade Runner 2049 (orange and purple)
+Drive (neon nights)
+The Grand Budapest Hotel (pastel symmetry)
+Amelie (warm green and red)
+Her (warm pastels)
+Moonlight (blue and purple)
+La La Land (vibrant primaries)
+1917 (desaturated war)
+Dune (desert gold)
+Joker (gritty urban)
+Black Panther (vibrant afrofuturism)
+
+# Sci-Fi Classics
+Blade Runner (noir neon)
+2001 A Space Odyssey (high contrast)
+Alien (desaturated green)
+The Fifth Element (vibrant future)
+Tron Legacy (cyan and orange)
+Arrival (muted mystery)
+Ex Machina (sterile white)
+Interstellar (warm earth vs cold space)
+Ghost in the Shell (cyberpunk neon)
+
+# Crime and Thriller
+The Godfather (warm amber)
+Goodfellas (rich saturated)
+Heat (cool blue nights)
+No Country for Old Men (bleached desert)
+Gone Girl (cold clinical)
+Sicario (dusty border)
+Skyfall (moody contrast)
+Casino Royale (desaturated action)
+The Dark Knight (teal and orange)
+Se7en (desaturated rain)
+
+# Period Pieces
+The Revenant (natural cold)
+There Will Be Blood (muted earth)
+Barry Lyndon (candlelit naturalism)
+Road to Perdition (rainy melancholy)
+The Assassination of Jesse James (amber dusk)
+Carol (muted 1950s)
+Brooklyn (warm nostalgia)
+Saving Private Ryan (desaturated combat)
+
+# Auteur Vision
+Wes Anderson films (pastel perfection)
+Wong Kar-wai films (neon romance)
+Terrence Malick films (golden hour)
+Christopher Nolan films (cool tones)
+David Fincher films (teal shadows)
+Nicolas Winding Refn films (neon violence)
+Park Chan-wook films (saturated revenge)
+Yorgos Lanthimos films (sterile surreal)
+
+# Horror
+Suspiria (primary color nightmare)
+The Shining (warm hotel gold)
+It Follows (suburban autumn)
+Midsommar (bright daylight horror)
+Hereditary (dark family tragedy)
+The Witch (desaturated period)
+Crimson Peak (gothic romance)
+
+# Fantasy and Adventure
+The Lord of the Rings (epic natural)
+Harry Potter (warm magic)
+Pan's Labyrinth (blue and amber)
+Life of Pi (vibrant ocean)
+Avatar (bioluminescent blue)
+The Fall (saturated fantasy)
+
+# Independent and Art House
+In the Mood for Love (neon nocturne)
+Chungking Express (handheld neon)
+Lost in Translation (Tokyo pastels)
+Call Me By Your Name (Italian summer)
+The Lighthouse (monochrome madness)
+Roma (black and white memory)
+Cold War (stark contrast)
+Portrait of a Lady on Fire (candlelit intimacy)
+
+# Westerns
+The Good the Bad and the Ugly (dusty western)
+True Grit (cold frontier)
+Django Unchained (vivid violence)
+Hell or High Water (modern western)
+
+# Action
+John Wick (neon action)
+Fury Road (desert warfare)
+The Raid (gritty combat)
+Atomic Blonde (cold war neon)
+
+# Romance
+In the Mood for Love (romantic reds)
+Blue Valentine (intimate contrast)
+Eternal Sunshine (memory fade)
+Brokeback Mountain (mountain blue)
+
+# Social Commentary
+Parasite (class contrast)
+Get Out (suburban uncanny)
+Three Billboards (americana decay)
+Manchester by the Sea (coastal gray)

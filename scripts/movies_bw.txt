@@ -1,0 +1,105 @@
+# Black and White Movies
+# Films shot in black and white with distinctive monochrome aesthetics
+# For use with --grayscale flag
+
+# Classic Noir
+The Third Man
+Double Indemnity
+Sunset Boulevard
+Touch of Evil
+The Maltese Falcon
+The Big Sleep
+Out of the Past
+Laura
+The Asphalt Jungle
+Night of the Hunter
+
+# German Expressionism
+Nosferatu (1922)
+The Cabinet of Dr. Caligari
+Metropolis
+M (Fritz Lang)
+
+# Classic Hollywood
+Citizen Kane
+Casablanca
+It's a Wonderful Life
+12 Angry Men
+The Apartment
+Some Like It Hot
+Psycho
+The Elephant Man
+Raging Bull
+
+# Foreign Cinema
+Bicycle Thieves
+La Dolce Vita
+8½ (Fellini)
+The Seventh Seal
+Wild Strawberries
+Persona (Bergman)
+Ikiru
+Rashomon
+Seven Samurai
+Tokyo Story
+Jules and Jim
+Breathless (Godard)
+The 400 Blows
+
+# Modern Black and White
+Schindler's List
+The Lighthouse
+Roma (Alfonso Cuaron)
+Frances Ha
+Manhattan (Woody Allen)
+Clerks
+Pi (Darren Aronofsky)
+Nebraska
+The Artist
+Cold War
+Ida
+A Girl Walks Home Alone at Night
+The White Ribbon
+Much Ado About Nothing (Whedon)
+
+# Horror
+The Lighthouse
+Night of the Living Dead
+Eraserhead
+Nosferatu (1922)
+Vampyr
+Eyes Without a Face
+Repulsion
+
+# Experimental
+Eraserhead (Lynch)
+The Lighthouse (Eggers)
+Gummo (black and white sections)
+Man with a Movie Camera
+
+# War and Drama
+Schindler's List
+The Longest Day
+Paths of Glory
+Dr. Strangelove
+The Grapes of Wrath
+
+# Documentary Style
+Man Bites Dog
+Coffee and Cigarettes
+Zelig
+Dead Man (Jarmusch)
+
+# Atmospheric Qualities
+film noir deep shadows
+high contrast noir
+low key lighting
+chiaroscuro dramatic
+German expressionist
+neorealist documentary
+French New Wave handheld
+silent film grain
+early cinema
+vintage newsreel
+documentary realism
+stark minimalism
