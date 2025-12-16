@@ -4,7 +4,6 @@ Batch LUT generation script using reference files.
 Creates sensible combinations of prompts and generates LUTs automatically.
 """
 
-import argparse
 import itertools
 import random
 import subprocess
@@ -12,13 +11,18 @@ import sys
 from pathlib import Path
 from typing import List, Tuple, Optional
 
+import torch
+import typer
+from PIL import Image
+from typing_extensions import Annotated
+
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.io import read_cube_file, load_image_as_tensor
 from utils.transforms import apply_lut
-from PIL import Image
-import torch
+
+app = typer.Typer()
 
 
 def load_references(file_path: Path) -> List[str]:
@@ -207,6 +211,7 @@ def generate_lut(
     steps: int = 500,
     lut_size: int = 16,
     batch_size: int = 4,
+    learning_rate: float = 0.005,
     test_image: Optional[Path] = None,
     dry_run: bool = False
 ) -> bool:
@@ -225,6 +230,7 @@ def generate_lut(
         "--steps", str(steps),
         "--lut-size", str(lut_size),
         "--batch-size", str(batch_size),
+        "--learning-rate", str(learning_rate),
     ]
 
     if is_grayscale:
@@ -259,142 +265,54 @@ def generate_lut(
         return False
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Batch generate LUTs from reference files",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Generate 100 random color LUTs
-  python scripts/generate_luts.py --image-folder images/ --sample 100 --output-dir luts/
+# This is the typer-based main() to replace argparse version in generate_luts.py
 
-  # Generate all movie-based LUTs (standalone only)
-  python scripts/generate_luts.py --image-folder images/ --standalone-only --output-dir luts/
+@app.command()
+def main(
+    image_folder: Annotated[Path, typer.Option(help="Folder containing training images")],
+    output_dir: Annotated[Path, typer.Option(help="Directory to save generated LUTs")] = Path("luts"),
+    sample: Annotated[Optional[int], typer.Option(help="Random sample size (generates this many LUTs total)")] = None,
+    color_only: Annotated[bool, typer.Option(help="Generate only color LUTs")] = False,
+    bw_only: Annotated[bool, typer.Option(help="Generate only black & white LUTs")] = False,
+    standalone_only: Annotated[bool, typer.Option(help="Generate only standalone LUTs (movies and directors)")] = False,
+    model_type: Annotated[str, typer.Option(help="Model to use")] = "clip",
+    steps: Annotated[str, typer.Option(help="Training iterations per LUT")] = "200-600",
+    lut_size: Annotated[int, typer.Option(help="LUT resolution")] = 16,
+    batch_size: Annotated[Optional[int], typer.Option(help="Batch size")] = None,
+    learning_rate: Annotated[float, typer.Option(help="Learning rate for optimization")] = 0.005,
+    test_image: Annotated[Optional[Path], typer.Option(help="Test image to apply each LUT to")] = None,
+    seed: Annotated[Optional[int], typer.Option(help="Random seed for reproducible sampling")] = None,
+    dry_run: Annotated[bool, typer.Option(help="Print commands without executing")] = False,
+):
+    """
+    Batch generate LUTs from reference files.
 
-  # Generate only B&W LUTs
-  python scripts/generate_luts.py --image-folder images/ --bw-only --sample 50 --output-dir luts/
+    Examples:
+      # Generate 100 random color LUTs
+      python scripts/generate_luts.py --image-folder images/ --sample 100 --output-dir luts/
 
-  # Generate with randomized steps between 300-800
-  python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --output-dir luts/
-
-  # Generate with fixed 1000 steps
-  python scripts/generate_luts.py --image-folder images/ --sample 10 --steps 1000 --output-dir luts/
-
-  # Dry run to see what would be generated
-  python scripts/generate_luts.py --image-folder images/ --sample 10 --dry-run
-        """
-    )
-
-    # Required arguments
-    parser.add_argument(
-        "--image-folder",
-        type=Path,
-        required=True,
-        help="Folder containing training images"
-    )
-
-    # Output options
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("luts"),
-        help="Directory to save generated LUTs (default: luts/)"
-    )
-
-    # Generation options
-    parser.add_argument(
-        "--sample",
-        type=int,
-        help="Random sample size (generates this many LUTs total)"
-    )
-
-    parser.add_argument(
-        "--color-only",
-        action="store_true",
-        help="Generate only color LUTs (film+emotion, film+color, emotion+color combos)"
-    )
-
-    parser.add_argument(
-        "--bw-only",
-        action="store_true",
-        help="Generate only black & white LUTs"
-    )
-
-    parser.add_argument(
-        "--standalone-only",
-        action="store_true",
-        help="Generate only standalone LUTs (movies and directors)"
-    )
-
-    # LUT parameters
-    parser.add_argument(
-        "--model-type",
-        default="clip",
-        choices=["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", "sds"],
-        help="Model to use for optimization (default: clip)"
-    )
-
-    parser.add_argument(
-        "--steps",
-        type=str,
-        default="200-600",
-        help="Training iterations per LUT. Can be a single value (e.g., '500') or a range (e.g., '200-600' for randomization). Default: '200-600'"
-    )
-
-    parser.add_argument(
-        "--lut-size",
-        type=int,
-        default=16,
-        help="LUT resolution (default: 16)"
-    )
-
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=None,
-        help="Batch size. If not specified, automatically set to 4 for CLIP, 1 for VLMs and SDS"
-    )
-
-    # Other options
-    parser.add_argument(
-        "--test-image",
-        type=Path,
-        help="Test image to apply each generated LUT to. Result saved as .png next to the LUT file"
-    )
-
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print commands without executing"
-    )
-
-    parser.add_argument(
-        "--seed",
-        type=int,
-        help="Random seed for reproducible sampling"
-    )
-
-    args = parser.parse_args()
-
-    if args.seed:
-        random.seed(args.seed)
+      # Generate with randomized steps between 300-800
+      python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --output-dir luts/
+    """
+    if seed:
+        random.seed(seed)
 
     # Parse steps range
-    min_steps, max_steps = parse_steps_range(args.steps)
+    min_steps, max_steps = parse_steps_range(steps)
     if min_steps == max_steps:
         print(f"Using fixed steps: {min_steps}")
     else:
         print(f"Using randomized steps: {min_steps}-{max_steps}")
 
     # Auto-adjust batch size based on model type if not specified
-    if args.batch_size is None:
-        if args.model_type == "clip":
-            args.batch_size = 4
+    if batch_size is None:
+        if model_type == "clip":
+            batch_size = 4
         else:  # sds, gemma3_4b, gemma3_12b, gemma3_27b
-            args.batch_size = 1
-        print(f"Auto-set batch size to {args.batch_size} for {args.model_type}")
+            batch_size = 1
+        print(f"Auto-set batch size to {batch_size} for {model_type}")
     else:
-        print(f"Using user-specified batch size: {args.batch_size}")
+        print(f"Using user-specified batch size: {batch_size}")
 
     # Load reference files
     prompts_dir = Path(__file__).parent / "prompts"
@@ -421,19 +339,19 @@ Examples:
     # Generate prompts based on mode
     all_prompts = []
 
-    if not args.bw_only and not args.standalone_only:
+    if not bw_only and not standalone_only:
         # Generate color combination prompts
         color_prompts = generate_color_prompts(colors, emotions, film_formats)
         print(f"Generated {len(color_prompts)} color combination prompts")
         all_prompts.extend(color_prompts)
 
-    if not args.color_only and not args.standalone_only:
+    if not color_only and not standalone_only:
         # Generate B&W prompts
         bw_prompts = generate_bw_prompts(emotions, film_formats_bw)
         print(f"Generated {len(bw_prompts)} B&W prompts")
         all_prompts.extend(bw_prompts)
 
-    if not args.color_only and not args.bw_only:
+    if not color_only and not bw_only:
         # Generate standalone prompts (movies + directors)
         standalone_prompts = generate_standalone_prompts(
             movies, directors, movies_bw, directors_bw
@@ -442,14 +360,14 @@ Examples:
         all_prompts.extend(standalone_prompts)
 
     # Sample if requested
-    if args.sample and args.sample < len(all_prompts):
-        all_prompts = random.sample(all_prompts, args.sample)
-        print(f"\nSampled {args.sample} prompts from total")
+    if sample and sample < len(all_prompts):
+        all_prompts = random.sample(all_prompts, sample)
+        print(f"\nSampled {sample} prompts from total")
 
     print(f"\nTotal prompts to generate: {len(all_prompts)}\n")
 
     # Create output directory
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate LUTs
     successful = 0
@@ -459,19 +377,20 @@ Examples:
         print(f"\n[{i}/{len(all_prompts)}]")
 
         # Randomize steps for each LUT within the specified range
-        steps = random.randint(min_steps, max_steps)
+        steps_value = random.randint(min_steps, max_steps)
 
         success = generate_lut(
             prompt=prompt,
             is_grayscale=is_grayscale,
-            image_folder=args.image_folder,
-            output_dir=args.output_dir,
-            model_type=args.model_type,
-            steps=steps,
-            lut_size=args.lut_size,
-            batch_size=args.batch_size,
-            test_image=args.test_image,
-            dry_run=args.dry_run
+            image_folder=image_folder,
+            output_dir=output_dir,
+            model_type=model_type,
+            steps=steps_value,
+            lut_size=lut_size,
+            batch_size=batch_size,
+            learning_rate=learning_rate,
+            test_image=test_image,
+            dry_run=dry_run
         )
 
         if success:
@@ -485,9 +404,9 @@ Examples:
     print(f"{'='*80}")
     print(f"Successful: {successful}")
     print(f"Failed: {failed}")
-    print(f"Output directory: {args.output_dir}")
+    print(f"Output directory: {output_dir}")
     print(f"{'='*80}\n")
 
 
 if __name__ == "__main__":
-    main()
+    app()

@@ -4,20 +4,23 @@ Generate utility LUTs using fixed mathematical transformations.
 These are technical adjustment LUTs for common color operations.
 """
 
-import argparse
+import sys
 from pathlib import Path
 from typing import Callable, Optional
 
 import torch
 import torchvision.transforms.functional as TF
+import typer
 from PIL import Image
+from typing_extensions import Annotated
 
 # Add parent directory to path for imports
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.transforms import identity_lut, apply_lut
 from utils.io import write_cube_file, load_image_as_tensor
+
+app = typer.Typer()
 
 
 def apply_saturation(lut: torch.Tensor, saturation_factor: float) -> torch.Tensor:
@@ -247,75 +250,46 @@ def generate_utility_lut(
             apply_lut_to_test_image(lut_transformed, test_image, test_output_path)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Generate utility LUTs with fixed mathematical transformations",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Generate all utility LUTs
-  python scripts/generate_utility_luts.py --output-dir luts/utility/
+@app.command()
+def main(
+    output_dir: Annotated[Path, typer.Option(help="Directory to save generated LUTs")] = Path("luts/utility"),
+    lut_size: Annotated[int, typer.Option(help="LUT resolution")] = 32,
+    saturation_only: Annotated[bool, typer.Option(help="Generate only saturation LUTs")] = False,
+    contrast_only: Annotated[bool, typer.Option(help="Generate only contrast LUTs")] = False,
+    brightness_only: Annotated[bool, typer.Option(help="Generate only brightness LUTs")] = False,
+    exposure_only: Annotated[bool, typer.Option(help="Generate only exposure LUTs")] = False,
+    gamma_only: Annotated[bool, typer.Option(help="Generate only gamma LUTs")] = False,
+    hue_only: Annotated[bool, typer.Option(help="Generate only hue LUTs")] = False,
+    temperature_only: Annotated[bool, typer.Option(help="Generate only temperature LUTs")] = False,
+    tint_only: Annotated[bool, typer.Option(help="Generate only tint LUTs")] = False,
+    grayscale_only: Annotated[bool, typer.Option(help="Generate only grayscale LUTs")] = False,
+    test_image: Annotated[Optional[Path], typer.Option(help="Test image to apply each LUT to")] = None,
+    dry_run: Annotated[bool, typer.Option(help="Preview without generating")] = False,
+):
+    """
+    Generate utility LUTs with fixed mathematical transformations.
 
-  # Generate only saturation LUTs
-  python scripts/generate_utility_luts.py --saturation-only --output-dir luts/
+    Examples:
+      # Generate all utility LUTs
+      python scripts/generate_utility_luts.py --output-dir luts/utility/
 
-  # Generate with higher resolution
-  python scripts/generate_utility_luts.py --lut-size 64 --output-dir luts/
-
-  # Preview what would be generated
-  python scripts/generate_utility_luts.py --dry-run
-        """
-    )
-
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("luts/utility"),
-        help="Directory to save generated LUTs (default: luts/utility/)"
-    )
-
-    parser.add_argument(
-        "--lut-size",
-        type=int,
-        default=32,
-        help="LUT resolution (default: 32)"
-    )
-
-    # Category filters
-    parser.add_argument("--saturation-only", action="store_true")
-    parser.add_argument("--contrast-only", action="store_true")
-    parser.add_argument("--brightness-only", action="store_true")
-    parser.add_argument("--exposure-only", action="store_true")
-    parser.add_argument("--gamma-only", action="store_true")
-    parser.add_argument("--hue-only", action="store_true")
-    parser.add_argument("--temperature-only", action="store_true")
-    parser.add_argument("--tint-only", action="store_true")
-    parser.add_argument("--grayscale-only", action="store_true")
-
-    parser.add_argument(
-        "--test-image",
-        type=Path,
-        help="Test image to apply each generated LUT to. Result saved as .png next to the LUT file"
-    )
-
-    parser.add_argument("--dry-run", action="store_true", help="Preview without generating")
-
-    args = parser.parse_args()
-
+      # Generate only saturation LUTs
+      python scripts/generate_utility_luts.py --saturation-only --output-dir luts/
+    """
     # Create output directory
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine which categories to generate
     generate_all = not any([
-        args.saturation_only, args.contrast_only, args.brightness_only,
-        args.exposure_only, args.gamma_only, args.hue_only,
-        args.temperature_only, args.tint_only, args.grayscale_only
+        saturation_only, contrast_only, brightness_only,
+        exposure_only, gamma_only, hue_only,
+        temperature_only, tint_only, grayscale_only
     ])
 
     luts_to_generate = []
 
     # Saturation LUTs
-    if generate_all or args.saturation_only:
+    if generate_all or saturation_only:
         luts_to_generate.extend([
             ("desaturate_25", lambda lut: apply_saturation(lut, 0.75)),
             ("desaturate_50", lambda lut: apply_saturation(lut, 0.5)),
@@ -326,7 +300,7 @@ Examples:
         ])
 
     # Contrast LUTs
-    if generate_all or args.contrast_only:
+    if generate_all or contrast_only:
         luts_to_generate.extend([
             ("low_contrast_50", lambda lut: apply_contrast(lut, 0.5)),
             ("low_contrast_75", lambda lut: apply_contrast(lut, 0.75)),
@@ -336,7 +310,7 @@ Examples:
         ])
 
     # Brightness LUTs
-    if generate_all or args.brightness_only:
+    if generate_all or brightness_only:
         luts_to_generate.extend([
             ("brightness_50", lambda lut: apply_brightness(lut, 0.5)),
             ("brightness_75", lambda lut: apply_brightness(lut, 0.75)),
@@ -346,7 +320,7 @@ Examples:
         ])
 
     # Exposure LUTs
-    if generate_all or args.exposure_only:
+    if generate_all or exposure_only:
         luts_to_generate.extend([
             ("exposure_minus_2", lambda lut: apply_exposure(lut, -2.0)),
             ("exposure_minus_1", lambda lut: apply_exposure(lut, -1.0)),
@@ -357,7 +331,7 @@ Examples:
         ])
 
     # Gamma LUTs
-    if generate_all or args.gamma_only:
+    if generate_all or gamma_only:
         luts_to_generate.extend([
             ("gamma_0_5", lambda lut: apply_gamma(lut, 0.5)),
             ("gamma_0_75", lambda lut: apply_gamma(lut, 0.75)),
@@ -368,7 +342,7 @@ Examples:
         ])
 
     # Hue shift LUTs (torchvision uses -0.5 to 0.5 range)
-    if generate_all or args.hue_only:
+    if generate_all or hue_only:
         luts_to_generate.extend([
             ("hue_shift_30", lambda lut: apply_hue(lut, 30/360)),      # ~0.083
             ("hue_shift_60", lambda lut: apply_hue(lut, 60/360)),      # ~0.167
@@ -380,7 +354,7 @@ Examples:
         ])
 
     # Temperature LUTs
-    if generate_all or args.temperature_only:
+    if generate_all or temperature_only:
         luts_to_generate.extend([
             ("cool_slight", lambda lut: apply_temperature(lut, -0.3)),
             ("cool_moderate", lambda lut: apply_temperature(lut, -0.6)),
@@ -391,7 +365,7 @@ Examples:
         ])
 
     # Tint LUTs
-    if generate_all or args.tint_only:
+    if generate_all or tint_only:
         luts_to_generate.extend([
             ("tint_magenta_slight", lambda lut: apply_tint(lut, -0.3)),
             ("tint_magenta_moderate", lambda lut: apply_tint(lut, -0.6)),
@@ -402,7 +376,7 @@ Examples:
         ])
 
     # Grayscale LUTs
-    if generate_all or args.grayscale_only:
+    if generate_all or grayscale_only:
         # Grayscale using torchvision
         luts_to_generate.append(
             ("grayscale_rec709", lambda lut: apply_grayscale(lut))
@@ -413,35 +387,35 @@ Examples:
         generate_utility_lut(
             "grayscale_identity",
             lambda lut: lut,  # No transformation, just identity
-            args.output_dir,
-            lut_size=args.lut_size,
+            output_dir,
+            lut_size=lut_size,
             grayscale=True,
-            test_image=args.test_image,
-            dry_run=args.dry_run
+            test_image=test_image,
+            dry_run=dry_run
         )
 
     # Generate all LUTs
     print(f"\nGenerating {len(luts_to_generate)} utility LUTs...")
-    print(f"Output directory: {args.output_dir}")
-    print(f"LUT size: {args.lut_size}\n")
+    print(f"Output directory: {output_dir}")
+    print(f"LUT size: {lut_size}\n")
 
     for name, transform_fn in luts_to_generate:
         generate_utility_lut(
             name,
             transform_fn,
-            args.output_dir,
-            lut_size=args.lut_size,
-            test_image=args.test_image,
-            dry_run=args.dry_run
+            output_dir,
+            lut_size=lut_size,
+            test_image=test_image,
+            dry_run=dry_run
         )
 
     print(f"\n{'='*80}")
     print(f"UTILITY LUT GENERATION COMPLETE")
     print(f"{'='*80}")
-    print(f"Generated {len(luts_to_generate) + (1 if (generate_all or args.grayscale_only) else 0)} LUTs")
-    print(f"Output directory: {args.output_dir}")
+    print(f"Generated {len(luts_to_generate) + (1 if (generate_all or grayscale_only) else 0)} LUTs")
+    print(f"Output directory: {output_dir}")
     print(f"{'='*80}\n")
 
 
 if __name__ == "__main__":
-    main()
+    app()
