@@ -8,8 +8,17 @@ import argparse
 import itertools
 import random
 import subprocess
+import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from utils.io import read_cube_file, load_image_as_tensor
+from utils.transforms import apply_lut
+from PIL import Image
+import torch
 
 
 def load_references(file_path: Path) -> List[str]:
@@ -163,6 +172,32 @@ def sanitize_filename(prompt: str) -> str:
     return safe[:100]
 
 
+def apply_lut_to_test_image(
+    lut_path: Path,
+    test_image_path: Path,
+    output_path: Path
+) -> None:
+    """Apply a LUT to a test image and save the result."""
+    try:
+        # Load LUT
+        lut_tensor, domain_min, domain_max = read_cube_file(str(lut_path))
+
+        # Load test image
+        image_tensor = load_image_as_tensor(str(test_image_path))
+
+        # Apply LUT
+        result = apply_lut(image_tensor, lut_tensor, domain_min, domain_max)
+
+        # Convert back to PIL and save
+        result_np = (result.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
+        result_img = Image.fromarray(result_np)
+        result_img.save(output_path)
+
+        print(f"  Saved test image result: {output_path}")
+    except Exception as e:
+        print(f"  WARNING: Failed to apply LUT to test image: {e}")
+
+
 def generate_lut(
     prompt: str,
     is_grayscale: bool,
@@ -172,6 +207,7 @@ def generate_lut(
     steps: int = 500,
     lut_size: int = 16,
     batch_size: int = 4,
+    test_image: Optional[Path] = None,
     dry_run: bool = False
 ) -> bool:
     """
@@ -207,6 +243,12 @@ def generate_lut(
 
     try:
         subprocess.run(cmd, check=True)
+
+        # Apply LUT to test image if provided
+        if test_image and not dry_run:
+            test_output_path = output_path.with_suffix('.png')
+            apply_lut_to_test_image(output_path, test_image, test_output_path)
+
         return True
     except subprocess.CalledProcessError as e:
         print(f"ERROR: Failed to generate LUT for '{prompt}': {e}")
@@ -311,6 +353,12 @@ Examples:
 
     # Other options
     parser.add_argument(
+        "--test-image",
+        type=Path,
+        help="Test image to apply each generated LUT to. Result saved as .png next to the LUT file"
+    )
+
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print commands without executing"
@@ -408,6 +456,7 @@ Examples:
             steps=steps,
             lut_size=args.lut_size,
             batch_size=args.batch_size,
+            test_image=args.test_image,
             dry_run=args.dry_run
         )
 

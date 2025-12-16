@@ -90,6 +90,16 @@ python scripts/generate_luts.py \
   --output-dir luts/vlm/
 ```
 
+#### Generate with test image preview
+```bash
+# Applies each LUT to test.jpg and saves result as .png
+python scripts/generate_luts.py \
+  --image-folder images/ \
+  --sample 50 \
+  --test-image test.jpg \
+  --output-dir luts/
+```
+
 #### Randomized optimization steps
 ```bash
 # Each LUT uses random steps between 300-800
@@ -145,6 +155,7 @@ python scripts/generate_luts.py \
 - `--batch-size N` - Batch size (default: 4)
 
 #### Other
+- `--test-image PATH` - Test image to apply each LUT to (saves .png alongside .cube file)
 - `--dry-run` - Preview without generating
 - `--seed N` - Random seed for reproducibility
 
@@ -308,6 +319,14 @@ The `generate_utility_luts.py` script creates technical adjustment LUTs using fi
 python scripts/generate_utility_luts.py --output-dir luts/utility/
 ```
 
+#### Generate with test image preview
+```bash
+# Applies each LUT to test.jpg and saves result as .png
+python scripts/generate_utility_luts.py \
+  --output-dir luts/utility/ \
+  --test-image test.jpg
+```
+
 #### Generate only saturation adjustments
 ```bash
 python scripts/generate_utility_luts.py --saturation-only --output-dir luts/
@@ -328,6 +347,7 @@ python scripts/generate_utility_luts.py --dry-run
 ```
 --output-dir PATH        Output directory (default: luts/utility/)
 --lut-size N            LUT resolution (default: 32)
+--test-image PATH       Test image to apply each LUT to (saves .png alongside .cube)
 
 # Category filters (generate only specific types)
 --saturation-only

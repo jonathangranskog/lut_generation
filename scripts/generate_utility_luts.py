@@ -6,17 +6,18 @@ These are technical adjustment LUTs for common color operations.
 
 import argparse
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
 import torchvision.transforms.functional as TF
+from PIL import Image
 
 # Add parent directory to path for imports
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.transforms import identity_lut
-from utils.io import write_cube_file
+from utils.transforms import identity_lut, apply_lut
+from utils.io import write_cube_file, load_image_as_tensor
 
 
 def apply_saturation(lut: torch.Tensor, saturation_factor: float) -> torch.Tensor:
@@ -187,12 +188,36 @@ def apply_tint(lut: torch.Tensor, tint: float) -> torch.Tensor:
     return result.clamp(0, 1)
 
 
+def apply_lut_to_test_image(
+    lut_tensor: torch.Tensor,
+    test_image_path: Path,
+    output_path: Path
+) -> None:
+    """Apply a LUT to a test image and save the result."""
+    try:
+        # Load test image
+        image_tensor = load_image_as_tensor(str(test_image_path))
+
+        # Apply LUT
+        result = apply_lut(image_tensor, lut_tensor)
+
+        # Convert back to PIL and save
+        result_np = (result.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
+        result_img = Image.fromarray(result_np)
+        result_img.save(output_path)
+
+        print(f"  Saved test image result: {output_path}")
+    except Exception as e:
+        print(f"  WARNING: Failed to apply LUT to test image: {e}")
+
+
 def generate_utility_lut(
     name: str,
     transform_fn: Callable[[torch.Tensor], torch.Tensor],
     output_dir: Path,
     lut_size: int = 32,
     grayscale: bool = False,
+    test_image: Optional[Path] = None,
     dry_run: bool = False
 ) -> None:
     """Generate and save a single utility LUT."""
@@ -215,6 +240,11 @@ def generate_utility_lut(
             grayscale=grayscale
         )
         print(f"Generated: {output_path}")
+
+        # Apply to test image if provided
+        if test_image:
+            test_output_path = output_path.with_suffix('.png')
+            apply_lut_to_test_image(lut_transformed, test_image, test_output_path)
 
 
 def main():
@@ -261,6 +291,12 @@ Examples:
     parser.add_argument("--temperature-only", action="store_true")
     parser.add_argument("--tint-only", action="store_true")
     parser.add_argument("--grayscale-only", action="store_true")
+
+    parser.add_argument(
+        "--test-image",
+        type=Path,
+        help="Test image to apply each generated LUT to. Result saved as .png next to the LUT file"
+    )
 
     parser.add_argument("--dry-run", action="store_true", help="Preview without generating")
 
@@ -380,6 +416,7 @@ Examples:
             args.output_dir,
             lut_size=args.lut_size,
             grayscale=True,
+            test_image=args.test_image,
             dry_run=args.dry_run
         )
 
@@ -394,6 +431,7 @@ Examples:
             transform_fn,
             args.output_dir,
             lut_size=args.lut_size,
+            test_image=args.test_image,
             dry_run=args.dry_run
         )
 
