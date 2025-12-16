@@ -129,6 +129,30 @@ def generate_standalone_prompts(
     return prompts
 
 
+def parse_steps_range(steps_str: str) -> tuple[int, int]:
+    """
+    Parse steps argument which can be either a single value or a range.
+
+    Args:
+        steps_str: Either "500" or "200-600"
+
+    Returns:
+        Tuple of (min_steps, max_steps)
+    """
+    if '-' in steps_str:
+        parts = steps_str.split('-')
+        if len(parts) != 2:
+            raise ValueError(f"Invalid steps range format: {steps_str}. Expected 'min-max' or single integer")
+        min_steps, max_steps = int(parts[0]), int(parts[1])
+        if min_steps > max_steps:
+            raise ValueError(f"Invalid range: min ({min_steps}) > max ({max_steps})")
+        return min_steps, max_steps
+    else:
+        # Single value - use same for min and max (no randomization)
+        steps = int(steps_str)
+        return steps, steps
+
+
 def sanitize_filename(prompt: str) -> str:
     """Convert prompt to a safe filename."""
     # Replace spaces with underscores, remove special chars
@@ -177,6 +201,7 @@ def generate_lut(
     print(f"\n{'='*80}")
     print(f"Generating LUT: {prompt}")
     print(f"Grayscale: {is_grayscale}")
+    print(f"Steps: {steps}")
     print(f"Output: {output_path}")
     print(f"{'='*80}\n")
 
@@ -202,6 +227,12 @@ Examples:
 
   # Generate only B&W LUTs
   python scripts/generate_luts.py --image-folder images/ --bw-only --sample 50 --output-dir luts/
+
+  # Generate with randomized steps between 300-800
+  python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --output-dir luts/
+
+  # Generate with fixed 1000 steps
+  python scripts/generate_luts.py --image-folder images/ --sample 10 --steps 1000 --output-dir luts/
 
   # Dry run to see what would be generated
   python scripts/generate_luts.py --image-folder images/ --sample 10 --dry-run
@@ -259,9 +290,9 @@ Examples:
 
     parser.add_argument(
         "--steps",
-        type=int,
-        default=500,
-        help="Training iterations per LUT (default: 500)"
+        type=str,
+        default="200-600",
+        help="Training iterations per LUT. Can be a single value (e.g., '500') or a range (e.g., '200-600' for randomization). Default: '200-600'"
     )
 
     parser.add_argument(
@@ -295,6 +326,13 @@ Examples:
 
     if args.seed:
         random.seed(args.seed)
+
+    # Parse steps range
+    min_steps, max_steps = parse_steps_range(args.steps)
+    if min_steps == max_steps:
+        print(f"Using fixed steps: {min_steps}")
+    else:
+        print(f"Using randomized steps: {min_steps}-{max_steps}")
 
     # Load reference files
     scripts_dir = Path(__file__).parent
@@ -358,13 +396,16 @@ Examples:
     for i, (prompt, is_grayscale) in enumerate(all_prompts, 1):
         print(f"\n[{i}/{len(all_prompts)}]")
 
+        # Randomize steps for each LUT within the specified range
+        steps = random.randint(min_steps, max_steps)
+
         success = generate_lut(
             prompt=prompt,
             is_grayscale=is_grayscale,
             image_folder=args.image_folder,
             output_dir=args.output_dir,
             model_type=args.model_type,
-            steps=args.steps,
+            steps=steps,
             lut_size=args.lut_size,
             batch_size=args.batch_size,
             dry_run=args.dry_run

@@ -90,12 +90,32 @@ python scripts/generate_luts.py \
   --output-dir luts/vlm/
 ```
 
+#### Randomized optimization steps
+```bash
+# Each LUT uses random steps between 300-800
+python scripts/generate_luts.py \
+  --image-folder images/ \
+  --sample 100 \
+  --steps 300-800 \
+  --output-dir luts/
+```
+
+#### Fixed optimization steps
+```bash
+# All LUTs use exactly 1000 steps
+python scripts/generate_luts.py \
+  --image-folder images/ \
+  --sample 50 \
+  --steps 1000 \
+  --output-dir luts/
+```
+
 #### High-quality, slow generation
 ```bash
 python scripts/generate_luts.py \
   --image-folder images/ \
   --model-type sds \
-  --steps 1000 \
+  --steps 800-1200 \
   --batch-size 1 \
   --sample 25 \
   --output-dir luts/high_quality/
@@ -117,13 +137,41 @@ python scripts/generate_luts.py \
 
 #### Model Parameters
 - `--model-type {clip,gemma3_4b,gemma3_12b,gemma3_27b,sds}` - Model (default: clip)
-- `--steps N` - Training iterations (default: 500)
+- `--steps N or MIN-MAX` - Training iterations. Can be:
+  - Single value: `--steps 500` (all LUTs use 500 steps)
+  - Range: `--steps 200-600` (each LUT uses random steps in range)
+  - Default: `200-600` (randomized for variety)
 - `--lut-size N` - LUT resolution (default: 16)
 - `--batch-size N` - Batch size (default: 4)
 
 #### Other
 - `--dry-run` - Preview without generating
 - `--seed N` - Random seed for reproducibility
+
+### Why Randomize Steps?
+
+By default, the script randomizes the number of optimization steps (200-600) for each LUT. This provides several benefits:
+
+**Variety in optimization trajectories:**
+- Some prompts converge quickly and benefit from shorter optimization
+- Others need more iterations to fully develop the aesthetic
+- Randomization naturally explores different convergence points
+
+**Diversity in results:**
+- Different step counts can produce subtle variations in the same prompt
+- Helps create a more diverse library even with similar prompts
+- Avoids homogeneous results from identical training lengths
+
+**Efficiency:**
+- Not all LUTs need maximum steps to achieve good results
+- Shorter steps for simpler prompts saves time
+- Longer steps reserved for when randomly selected
+
+**Discovery:**
+- Sometimes "under-trained" LUTs have interesting intermediate aesthetics
+- Explores the optimization landscape more thoroughly
+
+You can override this with `--steps N` for consistent results or `--steps MIN-MAX` for custom ranges.
 
 ### Estimated Generation Counts
 
