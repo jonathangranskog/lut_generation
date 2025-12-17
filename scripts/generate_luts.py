@@ -140,30 +140,34 @@ def generate_standalone_prompts(
     return prompts
 
 
-def parse_steps_range(steps_str: str) -> tuple[int, int]:
+def parse_range(value_str: str, value_type: type, param_name: str) -> tuple:
     """
-    Parse steps argument which can be either a single value or a range.
+    Parse a parameter that can be either a single value or a range.
 
     Args:
-        steps_str: Either "500" or "200-600"
+        value_str: Either a single value like "500" or a range like "200-600"
+        value_type: Type to convert to (int or float)
+        param_name: Name of parameter for error messages
 
     Returns:
-        Tuple of (min_steps, max_steps)
+        Tuple of (min_value, max_value)
     """
-    if "-" in steps_str:
-        parts = steps_str.split("-")
+    if "-" in value_str:
+        parts = value_str.split("-")
         if len(parts) != 2:
             raise ValueError(
-                f"Invalid steps range format: {steps_str}. Expected 'min-max' or single integer"
+                f"Invalid {param_name} range format: {value_str}. Expected 'min-max' or single {value_type.__name__}"
             )
-        min_steps, max_steps = int(parts[0]), int(parts[1])
-        if min_steps > max_steps:
-            raise ValueError(f"Invalid range: min ({min_steps}) > max ({max_steps})")
-        return min_steps, max_steps
+        min_val, max_val = value_type(parts[0]), value_type(parts[1])
+        if min_val > max_val:
+            raise ValueError(
+                f"Invalid {param_name} range: min ({min_val}) > max ({max_val})"
+            )
+        return min_val, max_val
     else:
         # Single value - use same for min and max (no randomization)
-        steps = int(steps_str)
-        return steps, steps
+        val = value_type(value_str)
+        return val, val
 
 
 def sanitize_filename(prompt: str) -> str:
@@ -344,8 +348,8 @@ def main(
     lut_size: Annotated[int, typer.Option(help="LUT resolution")] = 16,
     batch_size: Annotated[Optional[int], typer.Option(help="Batch size")] = None,
     learning_rate: Annotated[
-        float, typer.Option(help="Learning rate for optimization")
-    ] = 0.005,
+        str, typer.Option(help="Learning rate for optimization (single value or range)")
+    ] = "0.005",
     test_image: Annotated[
         Optional[Path], typer.Option(help="Test image to apply each LUT to")
     ] = None,
@@ -365,16 +369,29 @@ def main(
 
       # Generate with randomized steps between 300-800
       python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --output-dir luts/
+
+      # Generate with randomized learning rate between 0.001-0.01
+      python scripts/generate_luts.py --image-folder images/ --sample 50 --learning-rate 0.001-0.01 --output-dir luts/
+
+      # Generate with both randomized steps and learning rate
+      python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --learning-rate 0.001-0.01 --output-dir luts/
     """
     if seed:
         random.seed(seed)
 
     # Parse steps range
-    min_steps, max_steps = parse_steps_range(steps)
+    min_steps, max_steps = parse_range(steps, int, "steps")
     if min_steps == max_steps:
         print(f"Using fixed steps: {min_steps}")
     else:
         print(f"Using randomized steps: {min_steps}-{max_steps}")
+
+    # Parse learning rate range
+    min_lr, max_lr = parse_range(learning_rate, float, "learning rate")
+    if min_lr == max_lr:
+        print(f"Using fixed learning rate: {min_lr}")
+    else:
+        print(f"Using randomized learning rate: {min_lr}-{max_lr}")
 
     # Auto-adjust batch size based on model type if not specified
     if batch_size is None:
@@ -451,6 +468,9 @@ def main(
         # Randomize steps for each LUT within the specified range
         steps_value = random.randint(min_steps, max_steps)
 
+        # Randomize learning rate for each LUT within the specified range
+        learning_rate_value = random.uniform(min_lr, max_lr)
+
         success = generate_lut(
             prompt=prompt,
             is_grayscale=is_grayscale,
@@ -460,7 +480,7 @@ def main(
             steps=steps_value,
             lut_size=lut_size,
             batch_size=batch_size,
-            learning_rate=learning_rate,
+            learning_rate=learning_rate_value,
             test_image=test_image,
             dry_run=dry_run,
         )
