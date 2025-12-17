@@ -80,12 +80,15 @@ def read_cube_file(lut_path: str) -> tuple[torch.Tensor, list[float], list[float
     if len(lut_data) != expected_entries:
         raise ValueError(f"Expected {expected_entries} entries, got {len(lut_data)}")
 
-    # Convert to tensor and reshape
-    lut_tensor = torch.tensor(lut_data, dtype=torch.float32)
+    # Convert to numpy array first for Fortran-style reshape
+    lut_array = np.array(lut_data, dtype=np.float32)
 
-    # Reshape to 3D cube with spatial indexing as [B][G][R] (blue varies slowest, red varies fastest)
-    # Each position stores RGB values (not BGR values)
-    lut_cube = lut_tensor.reshape(lut_size, lut_size, lut_size, 3)
+    # .cube format uses column-major (Fortran-style) ordering where R varies fastest
+    # Reshape with Fortran order to get [R][G][B] indexing
+    lut_cube_np = lut_array.reshape((lut_size, lut_size, lut_size, 3), order='F')
+
+    # Convert to torch tensor
+    lut_cube = torch.from_numpy(lut_cube_np)
 
     return lut_cube, domain_min, domain_max
 
@@ -153,10 +156,11 @@ def write_cube_file(
 
         f.write("\n")
 
-        # Flatten LUT data following spatial indexing order [B][G][R] (blue varies slowest, red fastest)
-        # The tensor is already in [B][G][R] spatial order
-        # Each entry contains RGB values (channel order: R, G, B)
-        lut_data = lut_tensor.reshape(-1, 3).cpu()
+        # Flatten LUT data using Fortran-style (column-major) ordering
+        # The tensor has [R][G][B] spatial indexing
+        # Flatten with 'F' order so R varies fastest when writing
+        lut_array = lut_tensor.cpu().numpy()
+        lut_data = lut_array.reshape(-1, 3, order='F')
 
         # Write RGB values, one per line
         for rgb in lut_data:
