@@ -5,11 +5,12 @@ Creates sensible combinations of prompts and generates LUTs automatically.
 """
 
 import itertools
+import json
 import random
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 
 import typer
 from PIL import Image
@@ -175,6 +176,37 @@ def sanitize_filename(prompt: str) -> str:
     return safe[:100]
 
 
+def save_lut_metadata(
+    output_path: Path,
+    prompt: str,
+    is_grayscale: bool,
+    model_type: str,
+    steps: int,
+    lut_size: int,
+    batch_size: int,
+    learning_rate: float,
+) -> None:
+    """Save metadata JSON file alongside the LUT."""
+    metadata: Dict[str, Any] = {
+        "utility": False,
+        "prompt": prompt,
+        "black_and_white": is_grayscale,
+        "model": model_type,
+        "settings": {
+            "steps": steps,
+            "lut_size": lut_size,
+            "batch_size": batch_size,
+            "learning_rate": learning_rate,
+        },
+    }
+
+    metadata_path = output_path.with_suffix(".json")
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"  Saved metadata: {metadata_path}")
+
+
 def apply_lut_to_test_image(
     lut_path: Path, test_image_path: Path, output_path: Path
 ) -> None:
@@ -260,6 +292,19 @@ def generate_lut(
 
     try:
         subprocess.run(cmd, check=True)
+
+        # Save metadata
+        if not dry_run:
+            save_lut_metadata(
+                output_path=output_path,
+                prompt=prompt,
+                is_grayscale=is_grayscale,
+                model_type=model_type,
+                steps=steps,
+                lut_size=lut_size,
+                batch_size=batch_size,
+                learning_rate=learning_rate,
+            )
 
         # Apply LUT to test image if provided
         if test_image and not dry_run:
