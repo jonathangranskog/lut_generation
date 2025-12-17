@@ -12,8 +12,8 @@ def red_shifted_lut():
     """Create a LUT that adds a red shift to images."""
     lut = identity_lut(resolution=16).clone()  # Clone to ensure fresh copy
     # Add red shift: increase red channel by 0.15, clamp to [0, 1]
-    # a bit unintuitive but the LUT is indexed as BGR
-    lut[..., 2] = torch.clamp(lut[..., 2] + 0.15, 0, 1)
+    # LUT stores RGB values, so channel 0 is red
+    lut[..., 0] = torch.clamp(lut[..., 0] + 0.15, 0, 1)
     return lut
 
 

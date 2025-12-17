@@ -64,7 +64,7 @@ def read_cube_file(lut_path: str) -> tuple[torch.Tensor, list[float], list[float
     if lut_size is None:
         raise ValueError("LUT_3D_SIZE not found in cube file")
 
-    # Parse the RGB data
+    # Parse the RGB data (cube format stores values as RGB on each line)
     lut_data = []
     for i in range(data_start_idx, len(lines)):
         line = lines[i].strip()
@@ -80,12 +80,16 @@ def read_cube_file(lut_path: str) -> tuple[torch.Tensor, list[float], list[float
     if len(lut_data) != expected_entries:
         raise ValueError(f"Expected {expected_entries} entries, got {len(lut_data)}")
 
-    # Convert to tensor and reshape
-    lut_tensor = torch.tensor(lut_data, dtype=torch.float32)
+    # Convert to numpy array first for Fortran-style reshape
+    lut_array = np.array(lut_data, dtype=np.float32)
 
-    # Reshape to 3D cube indexed as [B][G][R] (blue varies slowest, red varies fastest)
-    # Output values remain in RGB order as stored in the file
-    lut_cube = lut_tensor.reshape(lut_size, lut_size, lut_size, 3)
+    # .cube format uses column-major (Fortran-style) ordering where R varies fastest
+    # and stores RGB values on each line
+    # Reshape with Fortran order to get [R][G][B] spatial indexing with RGB values
+    lut_cube_np = lut_array.reshape((lut_size, lut_size, lut_size, 3), order="F")
+
+    # Convert to torch tensor - keep [R][G][B] indexing
+    lut_cube = torch.from_numpy(lut_cube_np)
 
     return lut_cube, domain_min, domain_max
 
@@ -153,10 +157,12 @@ def write_cube_file(
 
         f.write("\n")
 
-        # Flatten LUT data in BGR indexing order (blue varies slowest, red fastest)
-        # The tensor is already in [B][G][R] order from our format
-        lut_data = lut_tensor.reshape(-1, 3).cpu()
+        # Flatten LUT data using Fortran-style (column-major) ordering
+        # The tensor has [R][G][B] spatial indexing with RGB values
+        # Flatten with 'F' order so R varies fastest when writing
+        lut_array = lut_tensor.cpu().numpy()
+        lut_data = lut_array.reshape(-1, 3, order="F")
 
-        # Write RGB values, one per line
+        # Write RGB values (cube format stores RGB on each line)
         for rgb in lut_data:
             f.write(f"{rgb[0]:.6f} {rgb[1]:.6f} {rgb[2]:.6f}\n")
