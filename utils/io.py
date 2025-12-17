@@ -85,11 +85,13 @@ def read_cube_file(lut_path: str) -> tuple[torch.Tensor, list[float], list[float
 
     # .cube format uses column-major (Fortran-style) ordering where R varies fastest
     # and stores RGB values on each line
-    # Reshape with Fortran order to get [R][G][B] spatial indexing with RGB values
+    # Reshape with Fortran order gives [R][G][B] spatial indexing initially
     lut_cube_np = lut_array.reshape((lut_size, lut_size, lut_size, 3), order='F')
 
-    # Convert to torch tensor
-    lut_cube = torch.from_numpy(lut_cube_np)
+    # Convert to torch tensor and permute to [B][G][R] for grid_sample compatibility
+    # grid_sample expects (D, H, W) where W is sampled by grid[..., 0] (R coordinate)
+    # So we need [B][G][R] where R is last dimension
+    lut_cube = torch.from_numpy(lut_cube_np).permute(2, 1, 0, 3)
 
     return lut_cube, domain_min, domain_max
 
@@ -157,10 +159,11 @@ def write_cube_file(
 
         f.write("\n")
 
-        # Flatten LUT data using Fortran-style (column-major) ordering
-        # The tensor has [R][G][B] spatial indexing with RGB values
-        # Flatten with 'F' order so R varies fastest when writing
-        lut_array = lut_tensor.cpu().numpy()
+        # Permute from [B][G][R] back to [R][G][B] for Fortran-style flatten
+        # Internal representation is [B][G][R], but .cube format expects [R][G][B] order
+        lut_array = lut_tensor.cpu().permute(2, 1, 0, 3).numpy()
+
+        # Flatten with Fortran order so R varies fastest when writing
         lut_data = lut_array.reshape(-1, 3, order='F')
 
         # Write RGB values (cube format stores RGB on each line)

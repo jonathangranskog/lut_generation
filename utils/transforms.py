@@ -65,16 +65,16 @@ def apply_lut(
     clamped_coords = torch.clamp(domain_scaled, 0, 1)
 
     # Prepare for grid_sample: need (N, C, D, H, W) and grid (N, D_out, H_out, W_out, 3)
-    # LUT is indexed spatially as [R][G][B] (cube file format uses Fortran-style/column-major)
-    # and stores RGB values at each position
-    # permute(3, 0, 1, 2) transforms (R, G, B, C) -> (C, R, G, B) where C is 1 or 3
-    lut = lut_tensor.permute(3, 0, 1, 2).unsqueeze(0).to(x.device)  # (1, C, R, G, B)
+    # LUT is indexed spatially as [B][G][R] and stores RGB values at each position
+    # permute(3, 0, 1, 2) transforms (B, G, R, C) -> (C, B, G, R) where C is 1 or 3
+    lut = lut_tensor.permute(3, 0, 1, 2).unsqueeze(0).to(x.device)  # (1, C, B, G, R)
     # Expand LUT for batch size
-    lut = lut.expand(B, -1, -1, -1, -1)  # (B, C, R, G, B)
+    lut = lut.expand(B, -1, -1, -1, -1)  # (B, C, B, G, R)
 
-    # RGB pixel coordinates already match LUT spatial indexing [R][G][B]
-    # e.g., pixel (R=1.0, G=0, B=0) looks up at LUT position [R=1.0][G=0][B=0]
-    # No flip needed!
+    # For grid_sample, grid[..., 0] samples W (rightmost) dimension
+    # grid[..., 1] samples H dimension, grid[..., 2] samples D (leftmost)
+    # LUT dims are (D, H, W) = (B, G, R), so pixel RGB=[r,g,b] maps to grid [r,g,b]
+    # which samples [W, H, D] = [R, G, B] correctly!
 
     # Image coordinates need to be in [-1, 1] range for grid_sample
     # Scale from [0, 1] to [-1, 1]
@@ -116,8 +116,8 @@ def apply_lut(
 def identity_lut(resolution: int = 32, grayscale: bool = False) -> torch.Tensor:
     """
     Create identity LUT using meshgrid.
-    Uses RGB spatial indexing to match .cube file format (column-major/Fortran-style).
-    At position [r,g,b], stores RGB output value [r,g,b] to preserve original color.
+    Creates [B][G][R] spatial indexing for grid_sample compatibility.
+    At position [b,g,r], stores RGB output value [r,g,b] to preserve original color.
 
     Args:
         resolution: Size of the LUT cube (e.g., 16, 32, 64)
@@ -127,14 +127,16 @@ def identity_lut(resolution: int = 32, grayscale: bool = False) -> torch.Tensor:
 
     Returns:
         LUT tensor of shape (size, size, size, 1) if grayscale else (size, size, size, 3)
+        with spatial indexing [B][G][R]
     """
     coords = torch.linspace(0, 1, resolution)
-    # Create identity LUT: at spatial position [r,g,b], store RGB value [r,g,b]
-    r, g, b = torch.meshgrid(coords, coords, coords, indexing="ij")
+    # Create identity LUT: at spatial position [b,g,r], store RGB value [r,g,b]
+    # grid_sample expects [B][G][R] where R is last spatial dim
+    b, g, r = torch.meshgrid(coords, coords, coords, indexing="ij")
 
     if grayscale:
         # Compute luminance using Rec. 709 coefficients: Y = 0.2126*R + 0.7152*G + 0.0722*B
-        # Position [r,g,b] should output luminance of [r,g,b]
+        # Position [b,g,r] should output luminance of [r,g,b]
         luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
         identity_lut = luminance.unsqueeze(-1)  # (size, size, size, 1)
     else:
