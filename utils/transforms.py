@@ -65,13 +65,15 @@ def apply_lut(
     clamped_coords = torch.clamp(domain_scaled, 0, 1)
 
     # Prepare for grid_sample: need (N, C, D, H, W) and grid (N, D_out, H_out, W_out, 3)
-    # LUT is indexed as [B][G][R] (cube file format), so we maintain that order
+    # LUT is indexed spatially as [B][G][R] (cube file format convention)
+    # but stores RGB values at each position
     # permute(3, 0, 1, 2) transforms (B, G, R, C) -> (C, B, G, R) where C is 1 or 3
     lut = lut_tensor.permute(3, 0, 1, 2).unsqueeze(0).to(x.device)  # (1, C, B, G, R)
     # Expand LUT for batch size
     lut = lut.expand(B, -1, -1, -1, -1)  # (B, C, B, G, R)
 
-    # Convert RGB coordinates to BGR for LUT indexing (matches GLSL shader's color.bgr)
+    # Convert RGB pixel coordinates to BGR for LUT spatial indexing
+    # e.g., pixel (R=1.0, G=0, B=0) looks up at LUT position [B=0][G=0][R=1.0]
     clamped_coords_bgr = clamped_coords.flip(-1)
 
     # Image coordinates need to be in [-1, 1] range for grid_sample
@@ -94,8 +96,8 @@ def apply_lut(
         # Replicate the single channel to RGB (all channels get same value)
         result = lut_sampled.repeat(1, 1, 1, 3)  # (B, H, W, 3)
     else:
-        # Flip the result to match the original color space
-        result = lut_sampled.flip(-1)
+        # Result is already in RGB order (LUT stores RGB values)
+        result = lut_sampled
 
     # Return in original format
     if not is_batched:
@@ -114,8 +116,8 @@ def apply_lut(
 def identity_lut(resolution: int = 32, grayscale: bool = False) -> torch.Tensor:
     """
     Create identity LUT using meshgrid.
-    Uses BGR indexing order to match cube file format.
-    At position [b,g,r], outputs RGB value [r,g,b] to preserve original color.
+    Uses BGR spatial indexing to match .cube file format convention.
+    At position [b,g,r], stores RGB output value [r,g,b] to preserve original color.
 
     Args:
         resolution: Size of the LUT cube (e.g., 16, 32, 64)
@@ -127,7 +129,7 @@ def identity_lut(resolution: int = 32, grayscale: bool = False) -> torch.Tensor:
         LUT tensor of shape (size, size, size, 1) if grayscale else (size, size, size, 3)
     """
     coords = torch.linspace(0, 1, resolution)
-    # Create identity LUT: position [b,g,r] outputs [r,g,b]
+    # Create identity LUT: at spatial position [b,g,r], store RGB value [r,g,b]
     b, g, r = torch.meshgrid(coords, coords, coords, indexing="ij")
 
     if grayscale:

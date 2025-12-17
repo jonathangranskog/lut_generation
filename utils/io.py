@@ -83,8 +83,8 @@ def read_cube_file(lut_path: str) -> tuple[torch.Tensor, list[float], list[float
     # Convert to tensor and reshape
     lut_tensor = torch.tensor(lut_data, dtype=torch.float32)
 
-    # Reshape to 3D cube indexed as [B][G][R] (blue varies slowest, red varies fastest)
-    # Output values remain in RGB order as stored in the file
+    # Reshape to 3D cube with spatial indexing as [B][G][R] (blue varies slowest, red varies fastest)
+    # Each position stores RGB values (not BGR values)
     lut_cube = lut_tensor.reshape(lut_size, lut_size, lut_size, 3)
 
     return lut_cube, domain_min, domain_max
@@ -153,8 +153,9 @@ def write_cube_file(
 
         f.write("\n")
 
-        # Flatten LUT data in BGR indexing order (blue varies slowest, red fastest)
-        # The tensor is already in [B][G][R] order from our format
+        # Flatten LUT data following spatial indexing order [B][G][R] (blue varies slowest, red fastest)
+        # The tensor is already in [B][G][R] spatial order
+        # Each entry contains RGB values (channel order: R, G, B)
         lut_data = lut_tensor.reshape(-1, 3).cpu()
 
         # Write RGB values, one per line
