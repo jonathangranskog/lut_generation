@@ -299,6 +299,7 @@ def generate_lut(
     lut_size: int = 16,
     batch_size: int = 4,
     learning_rate: float = 0.005,
+    image_text_weight: float = 1.0,
     test_image: Optional[Path] = None,
     dry_run: bool = False,
 ) -> bool:
@@ -328,6 +329,8 @@ def generate_lut(
         str(batch_size),
         "--learning-rate",
         str(learning_rate),
+        "--image-text-weight",
+        str(image_text_weight),
     ]
 
     if is_grayscale:
@@ -400,6 +403,7 @@ def main(
     model_type: Annotated[str, typer.Option(help="Model to use")] = "clip",
     steps: Annotated[str, typer.Option(help="Training iterations per LUT")] = "200-600",
     lut_size: Annotated[int, typer.Option(help="LUT resolution")] = 16,
+    image_text_weight: Annotated[float, typer.Option(help="Image text weight")] = 1.0,
     batch_size: Annotated[Optional[int], typer.Option(help="Batch size")] = None,
     learning_rate: Annotated[
         str, typer.Option(help="Learning rate for optimization (single value or range)")
@@ -540,6 +544,7 @@ def main(
             steps=steps_value,
             lut_size=lut_size,
             batch_size=batch_size,
+            image_text_weight=image_text_weight,
             learning_rate=learning_rate_value,
             test_image=test_image,
             dry_run=dry_run,
