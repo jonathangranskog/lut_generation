@@ -207,7 +207,6 @@ Higher resolution or long training of LUTs might lead to banding artifacts. To c
 
 * Better regularization so more complex LUTs can be generated
 * Other representations besides LUTs
-* Large-scale LUT library generation
 
 # License
 
