@@ -1,0 +1,59 @@
+# Cities with distinct visual characteristics for LUT generation
+# Each city evokes unique lighting, color palettes, and atmospheres
+
+# Major global cities
+New York City
+Los Angeles
+Chicago
+San Francisco
+Miami
+Las Vegas
+Tokyo
+Kyoto
+Hong Kong
+Shanghai
+Beijing
+Seoul
+Singapore
+Bangkok
+Mumbai
+Delhi
+Dubai
+Abu Dhabi
+Istanbul
+Moscow
+St. Petersburg
+London
+Paris
+Berlin
+Amsterdam
+Stockholm
+Copenhagen
+Rome
+Venice
+Milan
+Barcelona
+Madrid
+Lisbon
+Prague
+Vienna
+Budapest
+Athens
+Cairo
+Marrakech
+Cape Town
+Nairobi
+Sydney
+Melbourne
+Auckland
+Rio de Janeiro
+São Paulo
+Buenos Aires
+Mexico City
+Havana
+New Orleans
+Seattle
+Portland
+Austin
+Nashville
+Boston

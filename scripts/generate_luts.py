@@ -40,6 +40,8 @@ def generate_color_prompts(
     colors: List[str],
     emotions: List[str],
     film_formats: List[str],
+    cities: List[str],
+    weather: List[str],
     sample_size: int = None,
 ) -> List[Tuple[str, bool]]:
     """
@@ -60,17 +62,45 @@ def generate_color_prompts(
     for emotion, color in itertools.product(emotions, colors):
         prompts.append((f"{emotion} {color}", False))
 
-    # 4. Colors standalone
+    # 4. City + weather
+    for city, weather_term in itertools.product(cities, weather):
+        prompts.append((f"{city} {weather_term}", False))
+
+    # 5. City + emotion
+    for city, emotion in itertools.product(cities, emotions):
+        prompts.append((f"{city} {emotion}", False))
+
+    # 6. Weather + emotion
+    for weather_term, emotion in itertools.product(weather, emotions):
+        prompts.append((f"{weather_term} {emotion}", False))
+
+    # 7. City + color
+    for city, color in itertools.product(cities, colors):
+        prompts.append((f"{city} {color}", False))
+
+    # 8. Weather + color
+    for weather_term, color in itertools.product(weather, colors):
+        prompts.append((f"{weather_term} {color}", False))
+
+    # 9. Colors standalone
     for color in colors:
         prompts.append((color, False))
 
-    # 5. Emotions standalone
+    # 10. Emotions standalone
     for emotion in emotions:
         prompts.append((emotion, False))
 
-    # 6. Film stocks standalone
+    # 11. Film stocks standalone
     for film in film_formats:
         prompts.append((film, False))
+
+    # 12. Cities standalone
+    for city in cities:
+        prompts.append((city, False))
+
+    # 13. Weather standalone
+    for weather_term in weather:
+        prompts.append((weather_term, False))
 
     if sample_size and sample_size < len(prompts):
         prompts = random.sample(prompts, sample_size)
@@ -79,7 +109,11 @@ def generate_color_prompts(
 
 
 def generate_bw_prompts(
-    emotions: List[str], film_formats_bw: List[str], sample_size: int = None
+    emotions: List[str],
+    film_formats_bw: List[str],
+    cities: List[str],
+    weather: List[str],
+    sample_size: int = None,
 ) -> List[Tuple[str, bool]]:
     """
     Generate black & white LUT prompts.
@@ -98,6 +132,26 @@ def generate_bw_prompts(
     # 3. Emotions with "black and white" prefix
     for emotion in emotions:
         prompts.append((f"black and white {emotion}", True))
+
+    # 4. Cities with "black and white" prefix
+    for city in cities:
+        prompts.append((f"black and white {city}", True))
+
+    # 5. Weather with "black and white" prefix
+    for weather_term in weather:
+        prompts.append((f"black and white {weather_term}", True))
+
+    # 6. City + weather (B&W)
+    for city, weather_term in itertools.product(cities, weather):
+        prompts.append((f"black and white {city} {weather_term}", True))
+
+    # 7. City + emotion (B&W)
+    for city, emotion in itertools.product(cities, emotions):
+        prompts.append((f"black and white {city} {emotion}", True))
+
+    # 8. Weather + emotion (B&W)
+    for weather_term, emotion in itertools.product(weather, emotions):
+        prompts.append((f"black and white {weather_term} {emotion}", True))
 
     if sample_size and sample_size < len(prompts):
         prompts = random.sample(prompts, sample_size)
@@ -393,6 +447,8 @@ def main(
     emotions = load_references(prompts_dir / "emotions.txt")
     film_formats = load_references(prompts_dir / "film_formats.txt")
     film_formats_bw = load_references(prompts_dir / "film_formats_bw.txt")
+    cities = load_references(prompts_dir / "cities.txt")
+    weather = load_references(prompts_dir / "weather.txt")
     movies = load_references(prompts_dir / "movies.txt")
     movies_bw = load_references(prompts_dir / "movies_bw.txt")
     directors = load_references(prompts_dir / "directors.txt")
@@ -403,6 +459,8 @@ def main(
     print(f"  Emotions: {len(emotions)}")
     print(f"  Film formats (color): {len(film_formats)}")
     print(f"  Film formats (B&W): {len(film_formats_bw)}")
+    print(f"  Cities: {len(cities)}")
+    print(f"  Weather: {len(weather)}")
     print(f"  Movies (color): {len(movies)}")
     print(f"  Movies (B&W): {len(movies_bw)}")
     print(f"  Directors (color): {len(directors)}")
@@ -413,13 +471,15 @@ def main(
 
     if not bw_only and not standalone_only:
         # Generate color combination prompts
-        color_prompts = generate_color_prompts(colors, emotions, film_formats)
+        color_prompts = generate_color_prompts(
+            colors, emotions, film_formats, cities, weather
+        )
         print(f"Generated {len(color_prompts)} color combination prompts")
         all_prompts.extend(color_prompts)
 
     if not color_only and not standalone_only:
         # Generate B&W prompts
-        bw_prompts = generate_bw_prompts(emotions, film_formats_bw)
+        bw_prompts = generate_bw_prompts(emotions, film_formats_bw, cities, weather)
         print(f"Generated {len(bw_prompts)} B&W prompts")
         all_prompts.extend(bw_prompts)
 

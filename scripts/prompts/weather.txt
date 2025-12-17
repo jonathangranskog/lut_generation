@@ -1,0 +1,75 @@
+# Weather conditions and atmospheric effects for LUT generation
+# Each weather term creates distinct lighting, mood, and color characteristics
+
+# Basic weather conditions
+sunny
+cloudy
+overcast
+rainy
+stormy
+snowy
+foggy
+misty
+hazy
+
+# Time-based lighting
+golden hour
+blue hour
+sunset
+sunrise
+twilight
+dusk
+dawn
+midday sun
+harsh sunlight
+soft light
+
+# Atmospheric conditions
+humid
+dry
+dusty
+smoky
+crisp
+muggy
+
+# Precipitation
+drizzle
+heavy rain
+light rain
+thunderstorm
+snowfall
+sleet
+hail
+
+# Cloud types
+cumulus clouds
+stratus clouds
+cirrus clouds
+storm clouds
+dramatic clouds
+scattered clouds
+
+# Specialized conditions
+heat haze
+arctic cold
+desert heat
+tropical humidity
+mountain mist
+ocean breeze
+urban smog
+wildfire smoke
+autumn fog
+spring shower
+winter storm
+summer haze
+
+# Lighting effects
+diffused light
+harsh shadows
+soft shadows
+backlit
+rim light
+overexposed
+underexposed
+high contrast
+low contrast
