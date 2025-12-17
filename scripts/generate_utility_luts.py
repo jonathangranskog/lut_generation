@@ -139,6 +139,17 @@ def apply_grayscale(lut: torch.Tensor) -> torch.Tensor:
     return lut_result.clamp(0, 1)
 
 
+def apply_invert(lut: torch.Tensor) -> torch.Tensor:
+    """
+    Invert/negate colors (creates negative/inverted image effect).
+
+    Args:
+        lut: Input LUT tensor (size, size, size, 3)
+    """
+    # Invert by subtracting from 1.0 (negative effect)
+    return (1.0 - lut).clamp(0, 1)
+
+
 def apply_exposure(lut: torch.Tensor, exposure: float) -> torch.Tensor:
     """
     Adjust exposure (custom implementation using brightness).
@@ -311,6 +322,9 @@ def main(
     grayscale_only: Annotated[
         bool, typer.Option(help="Generate only grayscale LUTs")
     ] = False,
+    invert_only: Annotated[
+        bool, typer.Option(help="Generate only invert/negate LUTs")
+    ] = False,
     test_image: Annotated[
         Optional[Path], typer.Option(help="Test image to apply each LUT to")
     ] = None,
@@ -325,6 +339,9 @@ def main(
 
       # Generate only saturation LUTs
       python scripts/generate_utility_luts.py --saturation-only --output-dir luts/
+
+      # Generate only invert/negate LUTs
+      python scripts/generate_utility_luts.py --invert-only --output-dir luts/
 
       # Generate with test image preview
       python scripts/generate_utility_luts.py --output-dir luts/utility/ --test-image images/test.jpg
@@ -344,6 +361,7 @@ def main(
             temperature_only,
             tint_only,
             grayscale_only,
+            invert_only,
         ]
     )
 
@@ -634,6 +652,16 @@ def main(
             test_image=test_image,
             dry_run=dry_run,
             transformation_settings={"transformation": "identity"},
+        )
+
+    # Invert/Negate LUTs
+    if generate_all or invert_only:
+        luts_to_generate.append(
+            (
+                "invert",
+                lambda lut: apply_invert(lut),
+                {"transformation": "invert", "description": "Inverts all colors (negative effect)"},
+            )
         )
 
     # Generate all LUTs
