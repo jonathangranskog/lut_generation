@@ -525,46 +525,18 @@ def main(
         )
 
     # Hue shift LUTs (torchvision uses -0.5 to 0.5 range)
+    # Generate hue shifts in 15 degree increments from 15 to 345
     if generate_all or hue_only:
-        luts_to_generate.extend(
-            [
+        hue_luts = []
+        for degrees in range(15, 360, 15):
+            hue_luts.append(
                 (
-                    "hue_shift_30",
-                    lambda lut: apply_hue(lut, 30 / 360),
-                    {"transformation": "hue", "hue_shift_degrees": 30},
-                ),
-                (
-                    "hue_shift_60",
-                    lambda lut: apply_hue(lut, 60 / 360),
-                    {"transformation": "hue", "hue_shift_degrees": 60},
-                ),
-                (
-                    "hue_shift_90",
-                    lambda lut: apply_hue(lut, 90 / 360),
-                    {"transformation": "hue", "hue_shift_degrees": 90},
-                ),
-                (
-                    "hue_shift_120",
-                    lambda lut: apply_hue(lut, 120 / 360),
-                    {"transformation": "hue", "hue_shift_degrees": 120},
-                ),
-                (
-                    "hue_shift_180",
-                    lambda lut: apply_hue(lut, 0.5),
-                    {"transformation": "hue", "hue_shift_degrees": 180},
-                ),
-                (
-                    "hue_shift_240",
-                    lambda lut: apply_hue(lut, -120 / 360),
-                    {"transformation": "hue", "hue_shift_degrees": 240},
-                ),
-                (
-                    "hue_shift_300",
-                    lambda lut: apply_hue(lut, -60 / 360),
-                    {"transformation": "hue", "hue_shift_degrees": 300},
-                ),
-            ]
-        )
+                    f"hue_shift_{degrees}",
+                    lambda lut, d=degrees: apply_hue(lut, d / 360),
+                    {"transformation": "hue", "hue_shift_degrees": degrees},
+                )
+            )
+        luts_to_generate.extend(hue_luts)
 
     # Temperature LUTs
     if generate_all or temperature_only:
