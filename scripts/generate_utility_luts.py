@@ -150,6 +150,138 @@ def apply_invert(lut: torch.Tensor) -> torch.Tensor:
     return (1.0 - lut).clamp(0, 1)
 
 
+def apply_invert_channel(lut: torch.Tensor, channel: int) -> torch.Tensor:
+    """
+    Invert a specific color channel only.
+
+    Args:
+        lut: Input LUT tensor (size, size, size, 3)
+        channel: Channel to invert (0=Red, 1=Green, 2=Blue)
+    """
+    result = lut.clone()
+    result[..., channel] = 1.0 - result[..., channel]
+    return result.clamp(0, 1)
+
+
+def apply_partial_invert(lut: torch.Tensor, strength: float) -> torch.Tensor:
+    """
+    Partially invert colors (blend between original and inverted).
+
+    Args:
+        lut: Input LUT tensor (size, size, size, 3)
+        strength: Inversion strength (0.0 = original, 1.0 = fully inverted)
+    """
+    inverted = 1.0 - lut
+    result = lut * (1.0 - strength) + inverted * strength
+    return result.clamp(0, 1)
+
+
+def apply_luminance_invert(lut: torch.Tensor) -> torch.Tensor:
+    """
+    Invert luminance only, preserving hue and saturation.
+    Converts to HSV, inverts V channel, converts back to RGB.
+
+    Args:
+        lut: Input LUT tensor (size, size, size, 3)
+    """
+    shape = lut.shape
+    lut_flat = lut.reshape(-1, 3).permute(1, 0)  # (3, S*S*S)
+
+    # Convert RGB to HSV
+    # Using torchvision's rgb_to_hsv would be ideal, but we'll implement manually
+    r, g, b = lut_flat[0], lut_flat[1], lut_flat[2]
+
+    max_rgb, _ = torch.max(lut_flat, dim=0)
+    min_rgb, _ = torch.min(lut_flat, dim=0)
+    diff = max_rgb - min_rgb
+
+    # Value (brightness)
+    v = max_rgb
+
+    # Saturation
+    s = torch.where(max_rgb > 0, diff / max_rgb, torch.zeros_like(max_rgb))
+
+    # Hue
+    h = torch.zeros_like(max_rgb)
+    # Red is max
+    mask_r = (max_rgb == r) & (diff > 0)
+    h[mask_r] = ((g[mask_r] - b[mask_r]) / diff[mask_r]) % 6
+    # Green is max
+    mask_g = (max_rgb == g) & (diff > 0)
+    h[mask_g] = ((b[mask_g] - r[mask_g]) / diff[mask_g]) + 2
+    # Blue is max
+    mask_b = (max_rgb == b) & (diff > 0)
+    h[mask_b] = ((r[mask_b] - g[mask_b]) / diff[mask_b]) + 4
+    h = h / 6.0  # Normalize to [0, 1]
+
+    # Invert value (brightness)
+    v_inverted = 1.0 - v
+
+    # Convert HSV back to RGB
+    h6 = h * 6.0
+    i = torch.floor(h6).long()
+    f = h6 - i.float()
+
+    p = v_inverted * (1.0 - s)
+    q = v_inverted * (1.0 - f * s)
+    t = v_inverted * (1.0 - (1.0 - f) * s)
+
+    i = i % 6
+
+    r_out = torch.zeros_like(v_inverted)
+    g_out = torch.zeros_like(v_inverted)
+    b_out = torch.zeros_like(v_inverted)
+
+    # Assign RGB based on hue sector
+    mask0 = (i == 0)
+    r_out[mask0], g_out[mask0], b_out[mask0] = v_inverted[mask0], t[mask0], p[mask0]
+    mask1 = (i == 1)
+    r_out[mask1], g_out[mask1], b_out[mask1] = q[mask1], v_inverted[mask1], p[mask1]
+    mask2 = (i == 2)
+    r_out[mask2], g_out[mask2], b_out[mask2] = p[mask2], v_inverted[mask2], t[mask2]
+    mask3 = (i == 3)
+    r_out[mask3], g_out[mask3], b_out[mask3] = p[mask3], q[mask3], v_inverted[mask3]
+    mask4 = (i == 4)
+    r_out[mask4], g_out[mask4], b_out[mask4] = t[mask4], p[mask4], v_inverted[mask4]
+    mask5 = (i == 5)
+    r_out[mask5], g_out[mask5], b_out[mask5] = v_inverted[mask5], p[mask5], q[mask5]
+
+    lut_result = torch.stack([r_out, g_out, b_out], dim=0)
+    lut_result = lut_result.permute(1, 0).reshape(shape)
+
+    return lut_result.clamp(0, 1)
+
+
+def apply_film_negative_invert(lut: torch.Tensor, orange_r: float = 0.15, orange_g: float = 0.08) -> torch.Tensor:
+    """
+    Invert as if from color negative film with orange mask compensation.
+    Color negative film has an orange base that needs to be accounted for.
+
+    Args:
+        lut: Input LUT tensor (size, size, size, 3)
+        orange_r: Orange mask intensity for red channel (typical: 0.10-0.20)
+        orange_g: Orange mask intensity for green channel (typical: 0.05-0.12)
+    """
+    # First, compensate for the orange mask by adding it
+    # (simulating that the film negative has this orange base)
+    result = lut.clone()
+    result[..., 0] = result[..., 0] + orange_r  # Red channel
+    result[..., 1] = result[..., 1] + orange_g  # Green channel
+    # Blue channel typically has minimal orange mask
+
+    # Clamp after adding orange mask
+    result = result.clamp(0, 1)
+
+    # Then invert
+    result = 1.0 - result
+
+    # Apply a slight contrast boost typical for film negative conversion
+    # This helps recover some of the contrast lost in the process
+    result = result * 1.15
+
+    return result.clamp(0, 1)
+
+
 def apply_exposure(lut: torch.Tensor, exposure: float) -> torch.Tensor:
     """
     Adjust exposure (custom implementation using brightness).
@@ -340,11 +472,18 @@ def main(
       # Generate only saturation LUTs
       python scripts/generate_utility_luts.py --saturation-only --output-dir luts/
 
-      # Generate only invert/negate LUTs
+      # Generate only invert/negate LUTs (includes full, partial, channel, luminance, and film negative)
       python scripts/generate_utility_luts.py --invert-only --output-dir luts/
 
       # Generate with test image preview
       python scripts/generate_utility_luts.py --output-dir luts/utility/ --test-image images/test.jpg
+
+    Invert/Negate LUT variations:
+      - invert: Full RGB inversion (negative effect)
+      - invert_red/green/blue: Invert only specific color channels
+      - invert_25/50/75: Partial inversions (25%, 50%, 75% strength)
+      - invert_luminance: Inverts brightness only, preserves hue/saturation
+      - film_negative_light/medium/strong: Color negative film inversion with orange mask compensation
     """
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -656,12 +795,85 @@ def main(
 
     # Invert/Negate LUTs
     if generate_all or invert_only:
+        # Full inversion
         luts_to_generate.append(
             (
                 "invert",
                 lambda lut: apply_invert(lut),
                 {"transformation": "invert", "description": "Inverts all colors (negative effect)"},
             )
+        )
+
+        # Channel-specific inversions
+        luts_to_generate.extend(
+            [
+                (
+                    "invert_red",
+                    lambda lut: apply_invert_channel(lut, 0),
+                    {"transformation": "invert_channel", "channel": "red"},
+                ),
+                (
+                    "invert_green",
+                    lambda lut: apply_invert_channel(lut, 1),
+                    {"transformation": "invert_channel", "channel": "green"},
+                ),
+                (
+                    "invert_blue",
+                    lambda lut: apply_invert_channel(lut, 2),
+                    {"transformation": "invert_channel", "channel": "blue"},
+                ),
+            ]
+        )
+
+        # Partial inversions
+        luts_to_generate.extend(
+            [
+                (
+                    "invert_25",
+                    lambda lut: apply_partial_invert(lut, 0.25),
+                    {"transformation": "partial_invert", "strength": 0.25},
+                ),
+                (
+                    "invert_50",
+                    lambda lut: apply_partial_invert(lut, 0.5),
+                    {"transformation": "partial_invert", "strength": 0.5},
+                ),
+                (
+                    "invert_75",
+                    lambda lut: apply_partial_invert(lut, 0.75),
+                    {"transformation": "partial_invert", "strength": 0.75},
+                ),
+            ]
+        )
+
+        # Luminance-only inversion
+        luts_to_generate.append(
+            (
+                "invert_luminance",
+                lambda lut: apply_luminance_invert(lut),
+                {"transformation": "invert_luminance", "description": "Inverts brightness only, preserves hue/saturation"},
+            )
+        )
+
+        # Film negative inversions with different orange mask compensations
+        luts_to_generate.extend(
+            [
+                (
+                    "film_negative_light",
+                    lambda lut: apply_film_negative_invert(lut, orange_r=0.10, orange_g=0.05),
+                    {"transformation": "film_negative", "orange_mask": "light", "orange_r": 0.10, "orange_g": 0.05},
+                ),
+                (
+                    "film_negative_medium",
+                    lambda lut: apply_film_negative_invert(lut, orange_r=0.15, orange_g=0.08),
+                    {"transformation": "film_negative", "orange_mask": "medium", "orange_r": 0.15, "orange_g": 0.08},
+                ),
+                (
+                    "film_negative_strong",
+                    lambda lut: apply_film_negative_invert(lut, orange_r=0.20, orange_g=0.12),
+                    {"transformation": "film_negative", "orange_mask": "strong", "orange_r": 0.20, "orange_g": 0.12},
+                ),
+            ]
         )
 
     # Generate all LUTs
