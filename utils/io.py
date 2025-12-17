@@ -64,14 +64,14 @@ def read_cube_file(lut_path: str) -> tuple[torch.Tensor, list[float], list[float
     if lut_size is None:
         raise ValueError("LUT_3D_SIZE not found in cube file")
 
-    # Parse the RGB data
+    # Parse the BGR data (cube format stores values as BGR on each line)
     lut_data = []
     for i in range(data_start_idx, len(lines)):
         line = lines[i].strip()
         if line and not line.startswith("#"):
             try:
-                r, g, b = map(float, line.split())
-                lut_data.append([r, g, b])
+                b, g, r = map(float, line.split())
+                lut_data.append([b, g, r])
             except ValueError:
                 continue  # Skip invalid lines
 
@@ -84,10 +84,11 @@ def read_cube_file(lut_path: str) -> tuple[torch.Tensor, list[float], list[float
     lut_array = np.array(lut_data, dtype=np.float32)
 
     # .cube format uses column-major (Fortran-style) ordering where R varies fastest
-    # Reshape with Fortran order to get [R][G][B] indexing
+    # and stores BGR values on each line
+    # Reshape with Fortran order to get [R][G][B] spatial indexing
     lut_cube_np = lut_array.reshape((lut_size, lut_size, lut_size, 3), order='F')
 
-    # Flip channel dimension (BGR -> RGB) due to column-major storage
+    # Flip channel dimension from BGR to RGB for internal representation
     lut_cube_np = lut_cube_np[..., ::-1]
 
     # Convert to torch tensor
@@ -161,11 +162,11 @@ def write_cube_file(
 
         # Flatten LUT data using Fortran-style (column-major) ordering
         # The tensor has [R][G][B] spatial indexing with RGB values
-        # Flip channel dimension (RGB -> BGR) before writing for column-major format
+        # Flip channel dimension (RGB -> BGR) for writing (cube format stores BGR)
         lut_array = lut_tensor.cpu().numpy()
         lut_array_bgr = lut_array[..., ::-1].copy()
         lut_data = lut_array_bgr.reshape(-1, 3, order='F')
 
-        # Write BGR values (which appear as RGB due to column-major), one per line
+        # Write BGR values (cube format expectation)
         for bgr in lut_data:
             f.write(f"{bgr[0]:.6f} {bgr[1]:.6f} {bgr[2]:.6f}\n")
