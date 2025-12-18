@@ -54,6 +54,8 @@ Kodak Vision3 (desaturated reference)
 documentary black and white
 newsreel footage
 archival film grain
+medium format black and white
+large format black and white
 
 # Specialty B&W
 infrared black and white

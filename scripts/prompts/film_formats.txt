@@ -41,20 +41,28 @@ Super 8 color film
 70mm film
 IMAX film
 Vision3 cinema stock
+Medium format color film
+Large format color film
 
 # Specialty and Experimental Films
 Lomography Color Negative 400
 Lomography Color Negative 800
+Lomography Purple
 CineStill 50D
+CineStill 400D
 CineStill 800T
 Rollei Crossbird
 Rollei Infrared
 expired film
 cross-processed film
+duotone
 pushed film two stops
 pulled film one stop
 bleach bypass
 silver retention
+Kodak Aerochrome
+cyanotype
+redscale
 
 # Film Characteristics
 fine grain

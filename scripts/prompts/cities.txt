@@ -57,3 +57,5 @@ Portland
 Austin
 Nashville
 Boston
+Helsinki
+Oslo

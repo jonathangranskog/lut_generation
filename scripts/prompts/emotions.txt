@@ -37,6 +37,7 @@ sensual
 dreamy
 enchanted
 magical
+neon
 
 # Melancholic and Sad
 melancholic
