@@ -13,6 +13,17 @@ from utils.losses import (
 )
 
 
+class MockRepresentation:
+    """Mock representation for testing compute_losses."""
+
+    def __init__(self, lut_tensor):
+        self.lut_tensor = lut_tensor
+
+    def smoothness_loss(self):
+        """Mock smoothness loss."""
+        return lut_smoothness_loss(self.lut_tensor)
+
+
 class TestImageSmoothnessLoss:
     """Test image smoothness loss function."""
 
@@ -298,12 +309,13 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=2.0,
             image_smoothness=0.0,
             image_regularization=0.0,
@@ -326,12 +338,13 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=1.0,
             image_smoothness=0.1,
             image_regularization=0.2,
@@ -368,13 +381,14 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         # Enable only image smoothness and LUT smoothness
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=1.0,
             image_smoothness=0.5,
             image_regularization=0.0,
@@ -398,12 +412,13 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64, requires_grad=True)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3, requires_grad=True)
+        representation = MockRepresentation(lut)
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=1.0,
             image_smoothness=0.1,
             image_regularization=0.1,
@@ -427,12 +442,13 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=1.0,
             image_smoothness=0.0,
             image_regularization=0.0,
@@ -464,6 +480,7 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         (
             image_text_weight,
@@ -477,7 +494,7 @@ class TestComputeLosses:
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=image_text_weight,
             image_smoothness=image_smoothness,
             image_regularization=image_regularization,

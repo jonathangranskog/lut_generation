@@ -63,7 +63,7 @@ def compute_losses(
     loss_fn,
     transformed_images: torch.Tensor,
     original_images: torch.Tensor,
-    lut_tensor: torch.Tensor,
+    representation,
     image_text_weight: float,
     image_smoothness: float,
     image_regularization: float,
@@ -92,7 +92,7 @@ def compute_losses(
         loss_components["black"] = black_loss
 
     if lut_smoothness > 0:
-        lut_smooth_loss = lut_smoothness_loss(lut_tensor)
+        lut_smooth_loss = representation.smoothness_loss()
         loss = loss + lut_smoothness * lut_smooth_loss
         loss_components["lut_smooth"] = lut_smooth_loss
 

@@ -25,20 +25,16 @@ from typing_extensions import Annotated
 from models.clip import CLIPLoss
 from models.sds import SDSLoss
 from models.vlm import VLMLoss
+from representations import LUT, BWLUT
 from utils import (
     CLIP_IMAGE_SIZE,
     DEEPFLOYD_IMAGE_SIZE,
     VLM_IMAGE_SIZE,
     ImageDataset,
-    apply_lut,
     compute_losses,
     get_device,
-    identity_lut,
     load_image_as_tensor,
-    postprocess_lut,
-    read_cube_file,
     save_tensor_as_image,
-    write_cube_file,
 )
 
 ModelType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", "sds"]
@@ -118,40 +114,31 @@ def format_loss_log(
 
 def save_training_checkpoint(
     step: int,
-    lut_tensor: torch.Tensor,
+    representation,
     sample_images: list[torch.Tensor],
     output_dir: Path,
-    grayscale: bool = False,
 ) -> None:
     """
-    Save LUT and sample transformed images for training monitoring.
+    Save representation and sample transformed images for training monitoring.
 
     Args:
         step: Current training step
-        lut_tensor: Current LUT state
+        representation: Representation instance (LUT or BWLUT)
         sample_images: List of sample image tensors, each (C, H, W) in [0, 1] range
         output_dir: Directory to save checkpoints
-        grayscale: Whether to save LUT with replicated grayscale channel
     """
     # Create checkpoint directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save LUT
+    # Save representation
     lut_path = output_dir / f"lut_step_{step:05d}.cube"
-    write_cube_file(
-        str(lut_path),
-        lut_tensor.detach().cpu(),
-        domain_min=[0.0, 0.0, 0.0],
-        domain_max=[1.0, 1.0, 1.0],
-        title=f"Training Step {step}",
-        grayscale=grayscale,
-    )
+    representation.write(str(lut_path), title=f"Training Step {step}")
 
-    # Apply LUT to each sample image and save
+    # Apply representation to each sample image and save
     with torch.no_grad():
         for idx, sample_image in enumerate(sample_images):
-            # Apply LUT
-            transformed = apply_lut(sample_image, lut_tensor)
+            # Apply representation (non-training mode, with postprocessing)
+            transformed = representation.inference(sample_image, training=False)
 
             # Concatenate original and transformed images side-by-side
             concatenated = torch.cat([sample_image, transformed], dim=-1)
@@ -251,12 +238,14 @@ def optimize(
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
-    # Create LUT (trainable!)
-    lut_tensor = identity_lut(lut_size, grayscale=grayscale).to(device)
-    lut_tensor.requires_grad = True
+    # Create representation (trainable!)
+    if grayscale:
+        representation = BWLUT(size=lut_size, initialize_identity=True).to(device)
+    else:
+        representation = LUT(size=lut_size, initialize_identity=True).to(device)
 
-    # Create optimizer for LUT parameters
-    optimizer = Adam([lut_tensor], lr=learning_rate)
+    # Create optimizer for representation parameters
+    optimizer = Adam(representation.parameters(), lr=learning_rate)
 
     # Training loop
     step = 0
@@ -286,15 +275,15 @@ def optimize(
         for images in dataloader:
             images = images.to(device)
 
-            # Apply LUT to images
-            transformed_images = apply_lut(images, lut_tensor)
+            # Apply representation to images (training mode, no postprocessing)
+            transformed_images = representation.inference(images, training=True)
 
             # Compute all losses
             loss, loss_components = compute_losses(
                 loss_fn,
                 transformed_images,
                 images,
-                lut_tensor,
+                representation,
                 image_text_weight,
                 image_smoothness,
                 image_regularization,
@@ -307,13 +296,12 @@ def optimize(
             loss.backward()
 
             # Clip gradients to prevent extreme updates (reduces banding)
-            torch.nn.utils.clip_grad_norm_([lut_tensor], max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(representation.parameters(), max_norm=1.0)
 
             optimizer.step()
 
-            # Clamp LUT to valid range [0, 1]
-            with torch.no_grad():
-                lut_tensor.clamp_(0, 1)
+            # Clamp representation to valid range
+            representation.clamp()
 
             step += 1
 
@@ -322,10 +310,9 @@ def optimize(
                 sample_images_device = [img.to(device) for img in sample_images_cpu]
                 save_training_checkpoint(
                     step,
-                    postprocess_lut(lut_tensor),
+                    representation,
                     sample_images_device,
                     log_dir_path,
-                    grayscale,
                 )
                 if verbose:
                     logger.info(f"  → Saved checkpoint to {log_dir_path}/")
@@ -359,26 +346,16 @@ def optimize(
         sample_images_device = [img.to(device) for img in sample_images_cpu]
         save_training_checkpoint(
             step,
-            postprocess_lut(lut_tensor),
+            representation,
             sample_images_device,
             log_dir_path,
-            grayscale,
         )
         logger.info(f"Saved final checkpoint to {log_dir_path}/")
 
     logger.info(f"\nOptimization complete! Final loss: {loss.item():.4f}")
 
-    # Save LUT
-    domain_min = [0.0, 0.0, 0.0]
-    domain_max = [1.0, 1.0, 1.0]
-    write_cube_file(
-        output_path,
-        postprocess_lut(lut_tensor).detach().cpu(),
-        domain_min,
-        domain_max,
-        title=f"{model_type.upper()}: {prompt}",
-        grayscale=grayscale,
-    )
+    # Save representation
+    representation.write(output_path, title=f"{model_type.upper()}: {prompt}")
     logger.info(f"LUT saved to {output_path}")
 
 
@@ -401,14 +378,16 @@ def infer(
     # Select device (MPS is fine for inference)
     device = get_device(allow_mps=True)
 
-    # read lut file
-    lut_tensor, domain_min, domain_max = read_cube_file(lut)
+    # Load representation from file
+    representation = LUT.read(lut)
+    representation = representation.to(device)
 
     # Load and prepare image
     image_tensor = load_image_as_tensor(image)
-    image_tensor = image_tensor.to(device).unsqueeze(0)
-    image_tensor = apply_lut(image_tensor, lut_tensor, domain_min, domain_max)
-    image_tensor = image_tensor.squeeze(0)
+    image_tensor = image_tensor.to(device)
+
+    # Apply representation (non-training mode, with postprocessing)
+    image_tensor = representation.inference(image_tensor, training=False)
 
     # Save the transformed image
     save_tensor_as_image(image_tensor, output_path)
