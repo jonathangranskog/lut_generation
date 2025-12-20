@@ -320,7 +320,7 @@ class TestComputeLosses:
             image_smoothness=0.0,
             image_regularization=0.0,
             black_preservation=0.0,
-            lut_smoothness=0.0,
+            repr_smoothness=0.0,
         )
 
         assert torch.isclose(loss, torch.tensor(2.0)), (
@@ -349,7 +349,7 @@ class TestComputeLosses:
             image_smoothness=0.1,
             image_regularization=0.2,
             black_preservation=0.3,
-            lut_smoothness=0.4,
+            repr_smoothness=0.4,
         )
 
         # Should have all components
@@ -357,7 +357,7 @@ class TestComputeLosses:
         assert "img_smooth" in components
         assert "img_reg" in components
         assert "black" in components
-        assert "lut_smooth" in components
+        assert "repr_smooth" in components
         assert len(components) == 5
 
         # Total loss should be sum of weighted components
@@ -366,7 +366,7 @@ class TestComputeLosses:
             + 0.1 * components["img_smooth"]
             + 0.2 * components["img_reg"]
             + 0.3 * components["black"]
-            + 0.4 * components["lut_smooth"]
+            + 0.4 * components["repr_smooth"]
         )
         assert torch.isclose(loss, expected_loss, atol=1e-6), (
             "Total loss should be sum of weighted components"
@@ -383,7 +383,7 @@ class TestComputeLosses:
         lut = torch.rand(16, 16, 16, 3)
         representation = MockRepresentation(lut)
 
-        # Enable only image smoothness and LUT smoothness
+        # Enable only image smoothness and representation smoothness
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
@@ -393,12 +393,12 @@ class TestComputeLosses:
             image_smoothness=0.5,
             image_regularization=0.0,
             black_preservation=0.0,
-            lut_smoothness=0.5,
+            repr_smoothness=0.5,
         )
 
         assert "primary" in components
         assert "img_smooth" in components
-        assert "lut_smooth" in components
+        assert "repr_smooth" in components
         assert "img_reg" not in components, "Disabled loss should not be in components"
         assert "black" not in components, "Disabled loss should not be in components"
         assert len(components) == 3
@@ -423,7 +423,7 @@ class TestComputeLosses:
             image_smoothness=0.1,
             image_regularization=0.1,
             black_preservation=0.1,
-            lut_smoothness=0.1,
+            repr_smoothness=0.1,
         )
 
         loss.backward()
@@ -453,7 +453,7 @@ class TestComputeLosses:
             image_smoothness=0.0,
             image_regularization=0.0,
             black_preservation=0.0,
-            lut_smoothness=0.0,
+            repr_smoothness=0.0,
         )
 
         # Only primary should be present
@@ -487,7 +487,7 @@ class TestComputeLosses:
             image_smoothness,
             image_regularization,
             black_preservation,
-            lut_smoothness_weight,
+            repr_smoothness_weight,
         ) = weights
 
         loss, components = compute_losses(
@@ -499,7 +499,7 @@ class TestComputeLosses:
             image_smoothness=image_smoothness,
             image_regularization=image_regularization,
             black_preservation=black_preservation,
-            lut_smoothness=lut_smoothness_weight,
+            repr_smoothness=repr_smoothness_weight,
         )
 
         assert not torch.isnan(loss), "Loss should not be NaN"

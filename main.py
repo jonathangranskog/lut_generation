@@ -85,7 +85,7 @@ def format_loss_log(
     image_smoothness: float,
     image_regularization: float,
     black_preservation: float,
-    lut_smoothness: float,
+    repr_smoothness: float,
 ) -> str:
     """Format a detailed loss log message."""
     log_msg = f"Step {step}: Loss = {total_loss.item():.4f} (Primary: {(image_text_weight * loss_components['primary']).item():.4f}"
@@ -105,8 +105,8 @@ def format_loss_log(
             f", Black: {(black_preservation * loss_components['black']).item():.4f}"
         )
 
-    if lut_smoothness > 0 and "lut_smooth" in loss_components:
-        log_msg += f", LUT Smooth: {(lut_smoothness * loss_components['lut_smooth']).item():.4f}"
+    if repr_smoothness > 0 and "repr_smooth" in loss_components:
+        log_msg += f", Repr Smooth: {(repr_smoothness * loss_components['repr_smooth']).item():.4f}"
 
     log_msg += ")"
     return log_msg
@@ -131,8 +131,9 @@ def save_training_checkpoint(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Save representation
-    lut_path = output_dir / f"lut_step_{step:05d}.cube"
-    representation.write(str(lut_path), title=f"Training Step {step}")
+    with torch.no_grad():
+        lut_path = output_dir / f"lut_step_{step:05d}.cube"
+        representation.write(str(lut_path), title=f"Training Step {step}")
 
     # Apply representation to each sample image and save
     with torch.no_grad():
@@ -166,7 +167,7 @@ def optimize(
     image_smoothness: float = 1.0,
     image_regularization: float = 1.0,
     black_preservation: float = 1.0,
-    lut_smoothness: float = 1.0,
+    repr_smoothness: float = 1.0,
     log_interval: int = 50,
     verbose: bool = False,
     output_path: str = "lut.cube",
@@ -288,7 +289,7 @@ def optimize(
                 image_smoothness,
                 image_regularization,
                 black_preservation,
-                lut_smoothness,
+                repr_smoothness,
             )
 
             # Optimize
@@ -301,7 +302,8 @@ def optimize(
             optimizer.step()
 
             # Clamp representation to valid range
-            representation.clamp()
+            with torch.no_grad():
+                representation.clamp()
 
             step += 1
 
@@ -327,7 +329,7 @@ def optimize(
                     image_smoothness,
                     image_regularization,
                     black_preservation,
-                    lut_smoothness,
+                    repr_smoothness,
                 )
                 logger.info(log_msg)
             elif pbar is not None:
@@ -355,13 +357,14 @@ def optimize(
     logger.info(f"\nOptimization complete! Final loss: {loss.item():.4f}")
 
     # Save representation
-    representation.write(output_path, title=f"{model_type.upper()}: {prompt}")
+    with torch.no_grad():
+        representation.write(output_path, title=f"{model_type.upper()}: {prompt}")
     logger.info(f"LUT saved to {output_path}")
 
 
 @app.command()
 def infer(
-    lut: str,
+    ckpt_path: str,
     image: str,
     output_path: str = "output.png",
 ) -> None:
@@ -370,8 +373,8 @@ def infer(
     """
 
     # some error checking
-    if not os.path.exists(lut):
-        raise FileNotFoundError(f"LUT file not found: {lut}")
+    if not os.path.exists(ckpt_path):
+        raise FileNotFoundError(f"LUT file not found: {ckpt_path}")
     if not os.path.exists(image):
         raise FileNotFoundError(f"Image file not found: {image}")
 
@@ -379,7 +382,7 @@ def infer(
     device = get_device(allow_mps=True)
 
     # Load representation from file
-    representation = LUT.read(lut)
+    representation = LUT.read(ckpt_path)
     representation = representation.to(device)
 
     # Load and prepare image
@@ -387,7 +390,8 @@ def infer(
     image_tensor = image_tensor.to(device)
 
     # Apply representation (non-training mode, with postprocessing)
-    image_tensor = representation.inference(image_tensor, training=False)
+    with torch.no_grad():
+        image_tensor = representation.inference(image_tensor, training=False)
 
     # Save the transformed image
     save_tensor_as_image(image_tensor, output_path)

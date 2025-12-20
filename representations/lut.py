@@ -105,8 +105,7 @@ class LUT(BaseRepresentation):
         """
         # Apply postprocessing if not in training mode
         if not training:
-            with torch.no_grad():
-                self.postprocess()
+            self.postprocess()
 
         # Apply the LUT using trilinear interpolation
         return self._apply_lut(images, self.lut_tensor, self.domain_min, self.domain_max)
@@ -289,8 +288,7 @@ class LUT(BaseRepresentation):
             title: Title for the LUT file
         """
         # Apply postprocessing before writing
-        with torch.no_grad():
-            self.postprocess()
+        self.postprocess()
 
         lut_tensor = self.lut_tensor.detach()
 
@@ -339,14 +337,12 @@ class LUT(BaseRepresentation):
 
         This applies a downsampling-upsampling smoothing operation.
         """
-        with torch.no_grad():
-            smoothed = self._downsample_upsample_3d(self.lut_tensor)
-            self.lut_tensor.copy_(smoothed)
+        smoothed = self._downsample_upsample_3d(self.lut_tensor)
+        self.lut_tensor.copy_(smoothed)
 
     def clamp(self) -> None:
         """Clamp LUT values to valid range [0, 1]."""
-        with torch.no_grad():
-            self.lut_tensor.clamp_(0, 1)
+        self.lut_tensor.clamp_(0, 1)
 
 
 class BWLUT(LUT):
