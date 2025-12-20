@@ -233,17 +233,17 @@ def apply_luminance_invert(lut: torch.Tensor) -> torch.Tensor:
     b_out = torch.zeros_like(v_inverted)
 
     # Assign RGB based on hue sector
-    mask0 = (i == 0)
+    mask0 = i == 0
     r_out[mask0], g_out[mask0], b_out[mask0] = v_inverted[mask0], t[mask0], p[mask0]
-    mask1 = (i == 1)
+    mask1 = i == 1
     r_out[mask1], g_out[mask1], b_out[mask1] = q[mask1], v_inverted[mask1], p[mask1]
-    mask2 = (i == 2)
+    mask2 = i == 2
     r_out[mask2], g_out[mask2], b_out[mask2] = p[mask2], v_inverted[mask2], t[mask2]
-    mask3 = (i == 3)
+    mask3 = i == 3
     r_out[mask3], g_out[mask3], b_out[mask3] = p[mask3], q[mask3], v_inverted[mask3]
-    mask4 = (i == 4)
+    mask4 = i == 4
     r_out[mask4], g_out[mask4], b_out[mask4] = t[mask4], p[mask4], v_inverted[mask4]
-    mask5 = (i == 5)
+    mask5 = i == 5
     r_out[mask5], g_out[mask5], b_out[mask5] = v_inverted[mask5], p[mask5], q[mask5]
 
     lut_result = torch.stack([r_out, g_out, b_out], dim=0)
@@ -252,7 +252,9 @@ def apply_luminance_invert(lut: torch.Tensor) -> torch.Tensor:
     return lut_result.clamp(0, 1)
 
 
-def apply_film_negative_invert(lut: torch.Tensor, orange_r: float = 0.15, orange_g: float = 0.08) -> torch.Tensor:
+def apply_film_negative_invert(
+    lut: torch.Tensor, orange_r: float = 0.15, orange_g: float = 0.08
+) -> torch.Tensor:
     """
     Invert as if from color negative film with orange mask compensation.
     Color negative film has an orange base that needs to be accounted for.
@@ -802,7 +804,10 @@ def main(
             (
                 "invert",
                 lambda lut: apply_invert(lut),
-                {"transformation": "invert", "description": "Inverts all colors (negative effect)"},
+                {
+                    "transformation": "invert",
+                    "description": "Inverts all colors (negative effect)",
+                },
             )
         )
 
@@ -853,7 +858,10 @@ def main(
             (
                 "invert_luminance",
                 lambda lut: apply_luminance_invert(lut),
-                {"transformation": "invert_luminance", "description": "Inverts brightness only, preserves hue/saturation"},
+                {
+                    "transformation": "invert_luminance",
+                    "description": "Inverts brightness only, preserves hue/saturation",
+                },
             )
         )
 
@@ -862,18 +870,39 @@ def main(
             [
                 (
                     "film_negative_light",
-                    lambda lut: apply_film_negative_invert(lut, orange_r=0.10, orange_g=0.05),
-                    {"transformation": "film_negative", "orange_mask": "light", "orange_r": 0.10, "orange_g": 0.05},
+                    lambda lut: apply_film_negative_invert(
+                        lut, orange_r=0.10, orange_g=0.05
+                    ),
+                    {
+                        "transformation": "film_negative",
+                        "orange_mask": "light",
+                        "orange_r": 0.10,
+                        "orange_g": 0.05,
+                    },
                 ),
                 (
                     "film_negative_medium",
-                    lambda lut: apply_film_negative_invert(lut, orange_r=0.15, orange_g=0.08),
-                    {"transformation": "film_negative", "orange_mask": "medium", "orange_r": 0.15, "orange_g": 0.08},
+                    lambda lut: apply_film_negative_invert(
+                        lut, orange_r=0.15, orange_g=0.08
+                    ),
+                    {
+                        "transformation": "film_negative",
+                        "orange_mask": "medium",
+                        "orange_r": 0.15,
+                        "orange_g": 0.08,
+                    },
                 ),
                 (
                     "film_negative_strong",
-                    lambda lut: apply_film_negative_invert(lut, orange_r=0.20, orange_g=0.12),
-                    {"transformation": "film_negative", "orange_mask": "strong", "orange_r": 0.20, "orange_g": 0.12},
+                    lambda lut: apply_film_negative_invert(
+                        lut, orange_r=0.20, orange_g=0.12
+                    ),
+                    {
+                        "transformation": "film_negative",
+                        "orange_mask": "strong",
+                        "orange_r": 0.20,
+                        "orange_g": 0.12,
+                    },
                 ),
             ]
         )
