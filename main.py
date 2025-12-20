@@ -158,7 +158,6 @@ def optimize(
             help="Model type: clip, gemma3_4b, gemma3_12b, gemma3_27b, or sds"
         ),
     ] = "clip",
-    lut_size: int = 16,
     steps: int = 500,
     batch_size: int = 4,
     learning_rate: float = 5e-3,
@@ -192,13 +191,8 @@ def optimize(
     device = get_device(allow_mps=False)
     logger.info(f"Using device: {device}")
 
-    # Validate LUT size
-    valid_lut_sizes = [8, 16, 32, 64]
-    if lut_size not in valid_lut_sizes:
-        raise ValueError(
-            f"LUT size must be one of {valid_lut_sizes}, got {lut_size}. "
-            f"Larger sizes (>64) are prone to artifacts, smaller sizes (<8) lack detail."
-        )
+    # LUT size is fixed to 16
+    lut_size = 16
 
     # Select image size based on model type
     if model_type == "clip":

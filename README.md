@@ -95,7 +95,6 @@ python main.py optimize [OPTIONS]
   - `gemma3_27b`: Gemma 3 27B (highest quality, slowest)
   - `sds`: Score Distillation Sampling with DeepFloyd IF (pixel-space diffusion model)
   - Note: Gemma models compare original vs transformed images. They work best for precise minute LUTs.
-- `--lut-size INT`: LUT resolution (default: 16). Higher = more detailed, but more prone to banding artifacts
 - `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
 - `--grayscale`: Optimize a black-and-white LUT (single channel) that outputs same intensity for RGB (default: False)
