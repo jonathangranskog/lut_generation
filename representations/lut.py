@@ -103,12 +103,14 @@ class LUT(BaseRepresentation):
         Returns:
             torch.Tensor: Transformed images of the same shape as input
         """
-        # Apply postprocessing if not in training mode
+        # Use postprocessed LUT if not in training mode
         if not training:
-            self.postprocess()
+            lut_to_use = self.postprocess(self.lut_tensor)
+        else:
+            lut_to_use = self.lut_tensor
 
         # Apply the LUT using trilinear interpolation
-        return self._apply_lut(images, self.lut_tensor, self.domain_min, self.domain_max)
+        return self._apply_lut(images, lut_to_use, self.domain_min, self.domain_max)
 
     def _apply_lut(
         self,
@@ -288,10 +290,8 @@ class LUT(BaseRepresentation):
             file_path: Path to save the .cube file
             title: Title for the LUT file
         """
-        # Apply postprocessing before writing
-        self.postprocess()
-
-        lut_tensor = self.lut_tensor.detach()
+        # Apply postprocessing and get a smoothed copy
+        lut_tensor = self.postprocess(self.lut_tensor).detach()
 
         assert lut_tensor.ndim == 4, "LUT tensor must be 4D (size, size, size, C)"
         assert lut_tensor.shape[-1] in [1, 3], "LUT tensor must have 1 or 3 channels"
@@ -333,13 +333,18 @@ class LUT(BaseRepresentation):
             for rgb in lut_data:
                 f.write(f"{rgb[0]:.6f} {rgb[1]:.6f} {rgb[2]:.6f}\n")
 
-    def postprocess(self) -> None:
+    def postprocess(self, tensor: torch.Tensor) -> torch.Tensor:
         """Apply postprocessing (smoothing) to the LUT.
 
         This applies a downsampling-upsampling smoothing operation.
+
+        Args:
+            tensor: LUT tensor to postprocess.
+
+        Returns:
+            torch.Tensor: Smoothed version of the LUT tensor.
         """
-        smoothed = self._downsample_upsample_3d(self.lut_tensor)
-        self.lut_tensor.copy_(smoothed)
+        return self._downsample_upsample_3d(tensor)
 
     def clamp(self) -> None:
         """Clamp LUT values to valid range [0, 1]."""

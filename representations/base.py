@@ -61,14 +61,20 @@ class BaseRepresentation(nn.Module, ABC):
         """
         pass
 
-    def postprocess(self) -> None:
-        """Apply postprocessing to the representation.
+    def postprocess(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Apply postprocessing to a representation tensor.
 
         This is called during writing and during non-training inference.
-        By default, this is a no-op. Subclasses can override to implement
-        custom postprocessing logic (e.g., clamping, smoothing, etc.).
+        By default, returns the tensor unchanged. Subclasses can override to implement
+        custom postprocessing logic (e.g., smoothing, etc.).
+
+        Args:
+            tensor: The tensor to postprocess.
+
+        Returns:
+            torch.Tensor: Postprocessed version of the tensor.
         """
-        pass
+        return tensor
 
     @abstractmethod
     def clamp(self) -> None:
