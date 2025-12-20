@@ -240,7 +240,6 @@ def save_lut_metadata(
     is_grayscale: bool,
     model_type: str,
     steps: int,
-    lut_size: int,
     batch_size: int,
     learning_rate: float,
 ) -> None:
@@ -252,7 +251,7 @@ def save_lut_metadata(
         "model": model_type,
         "settings": {
             "steps": steps,
-            "lut_size": lut_size,
+            "lut_size": 16,  # LUT size is fixed to 16
             "batch_size": batch_size,
             "learning_rate": learning_rate,
         },
@@ -296,7 +295,6 @@ def generate_lut(
     output_dir: Path,
     model_type: str = "clip",
     steps: int = 500,
-    lut_size: int = 16,
     batch_size: int = 4,
     learning_rate: float = 0.005,
     image_text_weight: float = 1.0,
@@ -323,8 +321,6 @@ def generate_lut(
         model_type,
         "--steps",
         str(steps),
-        "--lut-size",
-        str(lut_size),
         "--batch-size",
         str(batch_size),
         "--learning-rate",
@@ -362,7 +358,6 @@ def generate_lut(
                 is_grayscale=is_grayscale,
                 model_type=model_type,
                 steps=steps,
-                lut_size=lut_size,
                 batch_size=batch_size,
                 learning_rate=learning_rate,
             )
@@ -402,7 +397,6 @@ def main(
     ] = False,
     model_type: Annotated[str, typer.Option(help="Model to use")] = "clip",
     steps: Annotated[str, typer.Option(help="Training iterations per LUT")] = "200-600",
-    lut_size: Annotated[int, typer.Option(help="LUT resolution")] = 16,
     image_text_weight: Annotated[float, typer.Option(help="Image text weight")] = 1.0,
     batch_size: Annotated[Optional[int], typer.Option(help="Batch size")] = None,
     learning_rate: Annotated[
@@ -589,7 +583,6 @@ def main(
             output_dir=output_dir,
             model_type=model_type,
             steps=steps_value,
-            lut_size=lut_size,
             batch_size=batch_size,
             image_text_weight=image_text_weight,
             learning_rate=learning_rate_value,

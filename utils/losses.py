@@ -63,12 +63,12 @@ def compute_losses(
     loss_fn,
     transformed_images: torch.Tensor,
     original_images: torch.Tensor,
-    lut_tensor: torch.Tensor,
+    representation,
     image_text_weight: float,
     image_smoothness: float,
     image_regularization: float,
     black_preservation: float,
-    lut_smoothness: float,
+    repr_smoothness: float,
 ) -> tuple[torch.Tensor, dict]:
     # Both CLIP and VLM loss functions accept (transformed_images, original_images)
     # CLIP ignores original_images, VLM uses it for context-aware evaluation
@@ -91,9 +91,9 @@ def compute_losses(
         loss = loss + black_preservation * black_loss
         loss_components["black"] = black_loss
 
-    if lut_smoothness > 0:
-        lut_smooth_loss = lut_smoothness_loss(lut_tensor)
-        loss = loss + lut_smoothness * lut_smooth_loss
-        loss_components["lut_smooth"] = lut_smooth_loss
+    if repr_smoothness > 0:
+        repr_smooth_loss = representation.smoothness_loss()
+        loss = loss + repr_smoothness * repr_smooth_loss
+        loss_components["repr_smooth"] = repr_smooth_loss
 
     return loss, loss_components
