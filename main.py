@@ -131,15 +131,14 @@ def save_training_checkpoint(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Save representation
-    with torch.no_grad():
-        lut_path = output_dir / f"lut_step_{step:05d}.cube"
-        representation.write(str(lut_path), title=f"Training Step {step}")
+    lut_path = output_dir / f"lut_step_{step:05d}.cube"
+    representation.write(str(lut_path), title=f"Training Step {step}")
 
     # Apply representation to each sample image and save
     with torch.no_grad():
         for idx, sample_image in enumerate(sample_images):
             # Apply representation (non-training mode, with postprocessing)
-            transformed = representation.inference(sample_image, training=False)
+            transformed = representation(sample_image, training=False)
 
             # Concatenate original and transformed images side-by-side
             concatenated = torch.cat([sample_image, transformed], dim=-1)
@@ -277,7 +276,7 @@ def optimize(
             images = images.to(device)
 
             # Apply representation to images (training mode, no postprocessing)
-            transformed_images = representation.inference(images, training=True)
+            transformed_images = representation(images, training=True)
 
             # Compute all losses
             loss, loss_components = compute_losses(
@@ -357,8 +356,7 @@ def optimize(
     logger.info(f"\nOptimization complete! Final loss: {loss.item():.4f}")
 
     # Save representation
-    with torch.no_grad():
-        representation.write(output_path, title=f"{model_type.upper()}: {prompt}")
+    representation.write(output_path, title=f"{model_type.upper()}: {prompt}")
     logger.info(f"LUT saved to {output_path}")
 
 
@@ -391,7 +389,7 @@ def infer(
 
     # Apply representation (non-training mode, with postprocessing)
     with torch.no_grad():
-        image_tensor = representation.inference(image_tensor, training=False)
+        image_tensor = representation(image_tensor, training=False)
 
     # Save the transformed image
     save_tensor_as_image(image_tensor, output_path)

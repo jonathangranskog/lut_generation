@@ -27,7 +27,7 @@ class BaseRepresentation(nn.Module, ABC):
         pass
 
     @abstractmethod
-    def inference(self, images: torch.Tensor, training: bool = False) -> torch.Tensor:
+    def forward(self, images: torch.Tensor, training: bool = False) -> torch.Tensor:
         """Apply the representation to a batch of images.
 
         Args:

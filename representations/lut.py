@@ -93,7 +93,7 @@ class LUT(BaseRepresentation):
         )
         return lut_result
 
-    def inference(self, images: torch.Tensor, training: bool = False) -> torch.Tensor:
+    def forward(self, images: torch.Tensor, training: bool = False) -> torch.Tensor:
         """Apply the LUT to a batch of images.
 
         Args:
@@ -280,6 +280,7 @@ class LUT(BaseRepresentation):
 
         return lut
 
+    @torch.no_grad()
     def write(self, file_path: str, title: str = "Generated LUT") -> None:
         """Save the LUT to a .cube file.
 
