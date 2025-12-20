@@ -414,6 +414,12 @@ def main(
     seed: Annotated[
         Optional[int], typer.Option(help="Random seed for reproducible sampling")
     ] = None,
+    bw_percentage: Annotated[
+        float,
+        typer.Option(
+            help="Percentage of black & white LUTs to generate (0.0-1.0, default 0.05 = 5%%)"
+        ),
+    ] = 0.05,
     dry_run: Annotated[
         bool, typer.Option(help="Print commands without executing")
     ] = False,
@@ -422,8 +428,11 @@ def main(
     Batch generate LUTs from reference files.
 
     Examples:
-      # Generate 100 random color LUTs
+      # Generate 100 random LUTs with 5% B&W (default)
       python scripts/generate_luts.py --image-folder images/ --sample 100 --output-dir luts/
+
+      # Generate 100 LUTs with 10% B&W
+      python scripts/generate_luts.py --image-folder images/ --sample 100 --bw-percentage 0.1 --output-dir luts/
 
       # Generate with randomized steps between 300-800
       python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --output-dir luts/
@@ -512,10 +521,48 @@ def main(
         print(f"Generated {len(standalone_prompts)} standalone prompts")
         all_prompts.extend(standalone_prompts)
 
-    # Sample if requested
+    # Sample if requested, respecting B&W percentage
     if sample and sample < len(all_prompts):
-        all_prompts = random.sample(all_prompts, sample)
-        print(f"\nSampled {sample} prompts from total")
+        # Validate bw_percentage
+        if not 0.0 <= bw_percentage <= 1.0:
+            print(
+                f"ERROR: bw_percentage must be between 0.0 and 1.0, got {bw_percentage}"
+            )
+            raise typer.Exit(1)
+
+        # Separate color and B&W prompts
+        color_prompts = [p for p in all_prompts if not p[1]]
+        bw_prompts = [p for p in all_prompts if p[1]]
+
+        # Calculate how many of each type to sample
+        num_bw = int(sample * bw_percentage)
+        num_color = sample - num_bw
+
+        # Ensure we don't try to sample more than available
+        if num_bw > len(bw_prompts):
+            print(
+                f"WARNING: Requested {num_bw} B&W LUTs but only {len(bw_prompts)} available"
+            )
+            num_bw = len(bw_prompts)
+            num_color = sample - num_bw
+
+        if num_color > len(color_prompts):
+            print(
+                f"WARNING: Requested {num_color} color LUTs but only {len(color_prompts)} available"
+            )
+            num_color = len(color_prompts)
+            num_bw = sample - num_color
+
+        # Sample from each category
+        sampled_bw = random.sample(bw_prompts, num_bw) if num_bw > 0 else []
+        sampled_color = random.sample(color_prompts, num_color) if num_color > 0 else []
+
+        all_prompts = sampled_color + sampled_bw
+        random.shuffle(all_prompts)  # Shuffle to mix color and B&W
+
+        print(f"\nSampled {len(all_prompts)} prompts from total:")
+        print(f"  Color: {num_color} ({num_color / len(all_prompts) * 100:.1f}%)")
+        print(f"  B&W: {num_bw} ({num_bw / len(all_prompts) * 100:.1f}%)")
 
     print(f"\nTotal prompts to generate: {len(all_prompts)}\n")
 
