@@ -685,10 +685,12 @@ def main(
     # Generate hue shifts in 15 degree increments from 15 to 345
     if generate_all or hue_only:
         hue_luts = []
-        for degrees in range(15, 360, 15):
+        for degrees in range(-180, 180, 15):
+            if degrees == 0:
+                continue
             hue_luts.append(
                 (
-                    f"hue_shift_{degrees}",
+                    f"hue_shift_{degrees}_degrees",
                     lambda lut, d=degrees: apply_hue(lut, d / 360),
                     {"transformation": "hue", "hue_shift_degrees": degrees},
                 )
