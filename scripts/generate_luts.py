@@ -4,14 +4,16 @@ Batch LUT generation script using reference files.
 Creates sensible combinations of prompts and generates LUTs automatically.
 """
 
+import atexit
 import itertools
 import json
 import random
+import signal
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import typer
 from PIL import Image
@@ -21,6 +23,25 @@ from typing_extensions import Annotated
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.config import Config, load_config
+
+# Track temp files for cleanup on interrupt
+_temp_files: Set[Path] = set()
+
+
+def _cleanup_temp_files() -> None:
+    for path in _temp_files:
+        path.unlink(missing_ok=True)
+
+
+def _signal_handler(signum: int, frame: Any) -> None:
+    _cleanup_temp_files()
+    sys.exit(1)
+
+
+atexit.register(_cleanup_temp_files)
+signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
+
 from utils.io import load_image_as_tensor, read_cube_file
 from utils.transforms import apply_lut
 
@@ -282,12 +303,13 @@ def generate_lut(
         batch_size=base_config.batch_size,
     )
 
-    # Create a temporary config file
+    # Create a temporary config file and track it for cleanup
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False
     ) as tmp_file:
         config.to_json(tmp_file.name)
-        tmp_config_path = tmp_file.name
+        tmp_config_path = Path(tmp_file.name)
+        _temp_files.add(tmp_config_path)
 
     cmd = [
         "python",
@@ -300,7 +322,7 @@ def generate_lut(
         "--output-path",
         str(output_path),
         "--config",
-        tmp_config_path,
+        str(tmp_config_path),
     ]
 
     # Pass test image to optimization for training visualization
@@ -309,8 +331,8 @@ def generate_lut(
 
     if dry_run:
         print(f"[DRY RUN] Would run: {' '.join(cmd)}")
-        # Clean up temp file
-        Path(tmp_config_path).unlink(missing_ok=True)
+        tmp_config_path.unlink(missing_ok=True)
+        _temp_files.discard(tmp_config_path)
         return True
 
     print(f"\n{'=' * 80}")
@@ -344,8 +366,8 @@ def generate_lut(
         print(f"ERROR: Failed to generate LUT for '{prompt}': {e}")
         return False
     finally:
-        # Clean up temp file
-        Path(tmp_config_path).unlink(missing_ok=True)
+        tmp_config_path.unlink(missing_ok=True)
+        _temp_files.discard(tmp_config_path)
 
 
 @app.command()
@@ -381,10 +403,10 @@ def main(
         typer.Option(help="Only generate standalone single-term prompts"),
     ] = False,
     steps: Annotated[
-        str, typer.Option(help="Training iterations per LUT (overrides config, supports ranges like 200-600)")
+        Optional[str], typer.Option(help="Training iterations per LUT (overrides config, supports ranges like 200-600)")
     ] = None,
     learning_rate: Annotated[
-        str, typer.Option(help="Learning rate for optimization (overrides config, supports ranges like 0.001-0.01)")
+        Optional[str], typer.Option(help="Learning rate for optimization (overrides config, supports ranges like 0.001-0.01)")
     ] = None,
     test_image: Annotated[
         Optional[Path], typer.Option(help="Test image to apply each LUT to")

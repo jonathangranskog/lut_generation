@@ -1,6 +1,6 @@
 """Utility functions and classes for LUT generation and manipulation."""
 
-from .config import Config, LossWeights, load_config
+from .config import Config, ConfigValidationError, LossWeights, load_config
 from .constants import (
     CLIP_IMAGE_SIZE,
     DEEPFLOYD_IMAGE_SIZE,
@@ -23,6 +23,7 @@ from .transforms import apply_lut, identity_lut, postprocess_lut
 __all__ = [
     # Config
     "Config",
+    "ConfigValidationError",
     "LossWeights",
     "load_config",
     # Constants
