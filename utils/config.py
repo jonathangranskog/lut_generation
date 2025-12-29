@@ -1,9 +1,9 @@
 """Configuration system for LUT optimization."""
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
-from typing import Literal
+from typing import Any, Dict, Literal
 
 RepresentationType = Literal["lut", "bw_lut"]
 ImageTextLossType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", "sds"]
@@ -19,12 +19,14 @@ class LossWeights:
     black_preservation: float = 1.0
     repr_smoothness: float = 1.0
 
-
-@dataclass
-class RepresentationArgs:
-    """Representation-specific arguments."""
-
-    lut_size: int = 16
+    @classmethod
+    def from_dict(cls, data: dict) -> "LossWeights":
+        """Create LossWeights from a dictionary, using defaults for missing keys."""
+        # Get valid field names from the dataclass
+        valid_fields = {f.name for f in fields(cls)}
+        # Filter to only include valid fields
+        filtered_data = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered_data)
 
 
 @dataclass
@@ -34,7 +36,7 @@ class Config:
     representation: RepresentationType = "lut"
     image_text_loss_type: ImageTextLossType = "clip"
     loss_weights: LossWeights = field(default_factory=LossWeights)
-    representation_args: RepresentationArgs = field(default_factory=RepresentationArgs)
+    representation_args: Dict[str, Any] = field(default_factory=dict)
     steps: int = 500
     learning_rate: float = 0.005
     batch_size: int = 4
@@ -42,28 +44,24 @@ class Config:
     @classmethod
     def from_dict(cls, data: dict) -> "Config":
         """Create a Config from a dictionary."""
+        # Handle nested LossWeights
         loss_weights_data = data.get("loss_weights", {})
-        loss_weights = LossWeights(
-            image_text=loss_weights_data.get("image_text", 1.0),
-            image_smoothness=loss_weights_data.get("image_smoothness", 1.0),
-            image_regularization=loss_weights_data.get("image_regularization", 1.0),
-            black_preservation=loss_weights_data.get("black_preservation", 1.0),
-            repr_smoothness=loss_weights_data.get("repr_smoothness", 1.0),
-        )
+        loss_weights = LossWeights.from_dict(loss_weights_data)
 
-        repr_args_data = data.get("representation_args", {})
-        representation_args = RepresentationArgs(
-            lut_size=repr_args_data.get("lut_size", 16),
-        )
+        # representation_args is just a dict, copy it directly
+        repr_args = dict(data.get("representation_args", {}))
+
+        # Get valid field names for Config (excluding nested ones we handle specially)
+        config_fields = {f.name for f in fields(cls)}
+        simple_fields = config_fields - {"loss_weights", "representation_args"}
+
+        # Build kwargs for simple fields
+        kwargs = {k: v for k, v in data.items() if k in simple_fields}
 
         return cls(
-            representation=data.get("representation", "lut"),
-            image_text_loss_type=data.get("image_text_loss_type", "clip"),
             loss_weights=loss_weights,
-            representation_args=representation_args,
-            steps=data.get("steps", 500),
-            learning_rate=data.get("learning_rate", 0.005),
-            batch_size=data.get("batch_size", 4),
+            representation_args=repr_args,
+            **kwargs,
         )
 
     @classmethod
@@ -75,23 +73,8 @@ class Config:
 
     def to_dict(self) -> dict:
         """Convert the Config to a dictionary."""
-        return {
-            "representation": self.representation,
-            "image_text_loss_type": self.image_text_loss_type,
-            "loss_weights": {
-                "image_text": self.loss_weights.image_text,
-                "image_smoothness": self.loss_weights.image_smoothness,
-                "image_regularization": self.loss_weights.image_regularization,
-                "black_preservation": self.loss_weights.black_preservation,
-                "repr_smoothness": self.loss_weights.repr_smoothness,
-            },
-            "representation_args": {
-                "lut_size": self.representation_args.lut_size,
-            },
-            "steps": self.steps,
-            "learning_rate": self.learning_rate,
-            "batch_size": self.batch_size,
-        }
+        result = asdict(self)
+        return result
 
     def to_json(self, file_path: str | Path) -> None:
         """Save the Config to a JSON file."""

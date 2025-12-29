@@ -1,12 +1,11 @@
 """Tests for the configuration system."""
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
 
-from utils.config import Config, LossWeights, RepresentationArgs, load_config
+from utils.config import Config, LossWeights, load_config
 
 
 class TestLossWeights:
@@ -38,17 +37,24 @@ class TestLossWeights:
 
 
 class TestRepresentationArgs:
-    """Tests for RepresentationArgs dataclass."""
+    """Tests for representation_args dict."""
 
     def test_default_values(self):
-        """Test default representation argument values."""
-        args = RepresentationArgs()
-        assert args.lut_size == 16
+        """Test default representation_args is empty dict."""
+        config = Config()
+        assert config.representation_args == {}
 
     def test_custom_values(self):
         """Test custom representation argument values."""
-        args = RepresentationArgs(lut_size=32)
-        assert args.lut_size == 32
+        config = Config(representation_args={"lut_size": 32})
+        assert config.representation_args.get("lut_size") == 32
+
+    def test_arbitrary_params(self):
+        """Test that representation_args can hold arbitrary parameters."""
+        config = Config(representation_args={"lut_size": 16, "custom_param": "value", "nested": {"a": 1}})
+        assert config.representation_args.get("lut_size") == 16
+        assert config.representation_args.get("custom_param") == "value"
+        assert config.representation_args.get("nested") == {"a": 1}
 
 
 class TestConfig:
@@ -63,7 +69,7 @@ class TestConfig:
         assert config.learning_rate == 0.005
         assert config.batch_size == 4
         assert config.loss_weights.image_text == 1.0
-        assert config.representation_args.lut_size == 16
+        assert config.representation_args == {}
 
     def test_custom_values(self):
         """Test custom config values."""
@@ -71,7 +77,7 @@ class TestConfig:
             representation="bw_lut",
             image_text_loss_type="sds",
             loss_weights=LossWeights(image_text=10.0),
-            representation_args=RepresentationArgs(lut_size=32),
+            representation_args={"lut_size": 32},
             steps=1000,
             learning_rate=0.01,
             batch_size=1,
@@ -82,7 +88,7 @@ class TestConfig:
         assert config.learning_rate == 0.01
         assert config.batch_size == 1
         assert config.loss_weights.image_text == 10.0
-        assert config.representation_args.lut_size == 32
+        assert config.representation_args.get("lut_size") == 32
 
     def test_from_dict(self):
         """Test creating config from dictionary."""
@@ -111,7 +117,7 @@ class TestConfig:
         assert config.loss_weights.image_smoothness == 0.5
         # Defaults should be preserved for unspecified values
         assert config.loss_weights.image_regularization == 1.0
-        assert config.representation_args.lut_size == 32
+        assert config.representation_args.get("lut_size") == 32
 
     def test_from_dict_with_defaults(self):
         """Test creating config from empty dictionary uses defaults."""
@@ -128,7 +134,7 @@ class TestConfig:
             representation="bw_lut",
             image_text_loss_type="sds",
             loss_weights=LossWeights(image_text=10.0, image_smoothness=0.5),
-            representation_args=RepresentationArgs(lut_size=32),
+            representation_args={"lut_size": 32},
             steps=1000,
             learning_rate=0.01,
             batch_size=1,
@@ -156,7 +162,7 @@ class TestConfig:
                 black_preservation=0.2,
                 repr_smoothness=0.1,
             ),
-            representation_args=RepresentationArgs(lut_size=8),
+            representation_args={"lut_size": 8},
             steps=750,
             learning_rate=0.003,
             batch_size=2,
@@ -173,8 +179,8 @@ class TestConfig:
         assert restored.loss_weights.image_text == original.loss_weights.image_text
         assert restored.loss_weights.image_smoothness == original.loss_weights.image_smoothness
         assert (
-            restored.representation_args.lut_size
-            == original.representation_args.lut_size
+            restored.representation_args.get("lut_size")
+            == original.representation_args.get("lut_size")
         )
 
 
@@ -189,7 +195,7 @@ class TestConfigIO:
             representation="bw_lut",
             image_text_loss_type="sds",
             loss_weights=LossWeights(image_text=10.0),
-            representation_args=RepresentationArgs(lut_size=32),
+            representation_args={"lut_size": 32},
             steps=1000,
             learning_rate=0.01,
             batch_size=1,
@@ -213,7 +219,7 @@ class TestConfigIO:
         assert loaded.learning_rate == original.learning_rate
         assert loaded.batch_size == original.batch_size
         assert loaded.loss_weights.image_text == original.loss_weights.image_text
-        assert loaded.representation_args.lut_size == original.representation_args.lut_size
+        assert loaded.representation_args.get("lut_size") == original.representation_args.get("lut_size")
 
     def test_load_config_function(self, temp_dir):
         """Test the load_config convenience function."""

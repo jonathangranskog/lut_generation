@@ -191,7 +191,7 @@ def optimize(
     image_regularization = cfg.loss_weights.image_regularization
     black_preservation = cfg.loss_weights.black_preservation
     repr_smoothness = cfg.loss_weights.repr_smoothness
-    lut_size = cfg.representation_args.lut_size
+    lut_size = cfg.representation_args.get("lut_size", 16)
     grayscale = cfg.representation == "bw_lut"
 
     # Select device (MPS doesn't support grid_sampler_3d_backward)

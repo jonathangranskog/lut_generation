@@ -1,6 +1,6 @@
 """Utility functions and classes for LUT generation and manipulation."""
 
-from .config import Config, LossWeights, RepresentationArgs, load_config
+from .config import Config, LossWeights, load_config
 from .constants import (
     CLIP_IMAGE_SIZE,
     DEEPFLOYD_IMAGE_SIZE,
@@ -24,7 +24,6 @@ __all__ = [
     # Config
     "Config",
     "LossWeights",
-    "RepresentationArgs",
     "load_config",
     # Constants
     "CLIP_IMAGE_SIZE",
