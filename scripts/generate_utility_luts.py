@@ -342,15 +342,14 @@ def apply_tint(lut: torch.Tensor, tint: float) -> torch.Tensor:
 def save_utility_lut_metadata(
     output_path: Path,
     lut_size: int,
-    grayscale: bool,
     transformation_settings: Dict[str, Any],
 ) -> None:
     """Save metadata JSON file alongside a utility LUT."""
     metadata: Dict[str, Any] = {
+        "prompt": None,
         "utility": True,
-        "black_and_white": grayscale,
-        "settings": {
-            "lut_size": lut_size,
+        "config": {
+            "size": lut_size,
             **transformation_settings,
         },
     }
@@ -416,12 +415,7 @@ def generate_utility_lut(
 
         # Save metadata
         if transformation_settings:
-            save_utility_lut_metadata(
-                output_path=output_path,
-                lut_size=lut_size,
-                grayscale=grayscale,
-                transformation_settings=transformation_settings,
-            )
+            save_utility_lut_metadata(output_path, lut_size, transformation_settings)
 
         # Apply to test image if provided
         if test_image:

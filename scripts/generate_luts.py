@@ -4,13 +4,16 @@ Batch LUT generation script using reference files.
 Creates sensible combinations of prompts and generates LUTs automatically.
 """
 
+import atexit
 import itertools
 import json
 import random
+import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import typer
 from PIL import Image
@@ -19,8 +22,27 @@ from typing_extensions import Annotated
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.io import read_cube_file, load_image_as_tensor
+from utils.config import Config, load_config
+from utils.io import load_image_as_tensor, read_cube_file
 from utils.transforms import apply_lut
+
+# Track temp files for cleanup on interrupt
+_temp_files: Set[Path] = set()
+
+
+def _cleanup_temp_files() -> None:
+    for path in _temp_files:
+        path.unlink(missing_ok=True)
+
+
+def _signal_handler(signum: int, frame: Any) -> None:
+    _cleanup_temp_files()
+    sys.exit(1)
+
+
+atexit.register(_cleanup_temp_files)
+signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
 
 app = typer.Typer()
 
@@ -42,7 +64,6 @@ def generate_color_prompts(
     film_formats: List[str],
     cities: List[str],
     weather: List[str],
-    sample_size: int = None,
 ) -> List[Tuple[str, bool]]:
     """
     Generate color LUT prompts with sensible combinations.
@@ -50,60 +71,49 @@ def generate_color_prompts(
     """
     prompts = []
 
-    # 1. Film stock + emotion
+    # Film stock + emotion
     for film, emotion in itertools.product(film_formats, emotions):
         prompts.append((f"{film} {emotion}", False))
 
-    # 2. Film stock + color
+    # Film stock + color
     for film, color in itertools.product(film_formats, colors):
         prompts.append((f"{film} {color}", False))
 
-    # 3. Emotion + color
+    # Emotion + color
     for emotion, color in itertools.product(emotions, colors):
         prompts.append((f"{emotion} {color}", False))
 
-    # 4. City + weather
+    # City + weather
     for city, weather_term in itertools.product(cities, weather):
         prompts.append((f"{city} {weather_term}", False))
 
-    # 5. City + emotion
+    # City + emotion
     for city, emotion in itertools.product(cities, emotions):
         prompts.append((f"{city} {emotion}", False))
 
-    # 6. Weather + emotion
+    # Weather + emotion
     for weather_term, emotion in itertools.product(weather, emotions):
         prompts.append((f"{weather_term} {emotion}", False))
 
-    # 7. City + color
+    # City + color
     for city, color in itertools.product(cities, colors):
         prompts.append((f"{city} {color}", False))
 
-    # 8. Weather + color
+    # Weather + color
     for weather_term, color in itertools.product(weather, colors):
         prompts.append((f"{weather_term} {color}", False))
 
-    # 9. Colors standalone
+    # Standalone terms
     for color in colors:
         prompts.append((color, False))
-
-    # 10. Emotions standalone
     for emotion in emotions:
         prompts.append((emotion, False))
-
-    # 11. Film stocks standalone
     for film in film_formats:
         prompts.append((film, False))
-
-    # 12. Cities standalone
     for city in cities:
         prompts.append((city, False))
-
-    # 13. Weather standalone
     for weather_term in weather:
         prompts.append((weather_term, False))
-
-    if sample_size and sample_size < len(prompts):
-        prompts = random.sample(prompts, sample_size)
 
     return prompts
 
@@ -113,7 +123,6 @@ def generate_bw_prompts(
     film_formats_bw: List[str],
     cities: List[str],
     weather: List[str],
-    sample_size: int = None,
 ) -> List[Tuple[str, bool]]:
     """
     Generate black & white LUT prompts.
@@ -121,40 +130,33 @@ def generate_bw_prompts(
     """
     prompts = []
 
-    # 1. B&W film stock + emotion
+    # B&W film stock + emotion (film stocks are already B&W, no prefix needed)
     for film, emotion in itertools.product(film_formats_bw, emotions):
         prompts.append((f"{film} {emotion}", True))
 
-    # 2. B&W film stocks standalone
+    # B&W film stocks standalone
     for film in film_formats_bw:
         prompts.append((film, True))
 
-    # 3. Emotions with "black and white" prefix
+    # Generic terms need "black and white" prefix
     for emotion in emotions:
         prompts.append((f"black and white {emotion}", True))
 
-    # 4. Cities with "black and white" prefix
     for city in cities:
         prompts.append((f"black and white {city}", True))
 
-    # 5. Weather with "black and white" prefix
     for weather_term in weather:
         prompts.append((f"black and white {weather_term}", True))
 
-    # 6. City + weather (B&W)
+    # Combinations with "black and white" prefix
     for city, weather_term in itertools.product(cities, weather):
         prompts.append((f"black and white {city} {weather_term}", True))
 
-    # 7. City + emotion (B&W)
     for city, emotion in itertools.product(cities, emotions):
         prompts.append((f"black and white {city} {emotion}", True))
 
-    # 8. Weather + emotion (B&W)
     for weather_term, emotion in itertools.product(weather, emotions):
         prompts.append((f"black and white {weather_term} {emotion}", True))
-
-    if sample_size and sample_size < len(prompts):
-        prompts = random.sample(prompts, sample_size)
 
     return prompts
 
@@ -164,7 +166,6 @@ def generate_standalone_prompts(
     directors: List[str],
     movies_bw: List[str],
     directors_bw: List[str],
-    sample_size: int = None,
 ) -> List[Tuple[str, bool]]:
     """
     Generate prompts from movies and directors (standalone only).
@@ -180,32 +181,19 @@ def generate_standalone_prompts(
     for director in directors:
         prompts.append((director, False))
 
-    # Movies (B&W)
+    # Movies (B&W) - these are already B&W movies, no prefix needed
     for movie in movies_bw:
         prompts.append((movie, True))
 
-    # Directors (B&W)
+    # Directors (B&W) - these are already B&W directors, no prefix needed
     for director in directors_bw:
         prompts.append((director, True))
-
-    if sample_size and sample_size < len(prompts):
-        prompts = random.sample(prompts, sample_size)
 
     return prompts
 
 
 def parse_range(value_str: str, value_type: type, param_name: str) -> tuple:
-    """
-    Parse a parameter that can be either a single value or a range.
-
-    Args:
-        value_str: Either a single value like "500" or a range like "200-600"
-        value_type: Type to convert to (int or float)
-        param_name: Name of parameter for error messages
-
-    Returns:
-        Tuple of (min_value, max_value)
-    """
+    """Parse a parameter that can be either a single value or a range."""
     if "-" in value_str:
         parts = value_str.split("-")
         if len(parts) != 2:
@@ -219,42 +207,28 @@ def parse_range(value_str: str, value_type: type, param_name: str) -> tuple:
             )
         return min_val, max_val
     else:
-        # Single value - use same for min and max (no randomization)
         val = value_type(value_str)
         return val, val
 
 
 def sanitize_filename(prompt: str) -> str:
     """Convert prompt to a safe filename."""
-    # Replace spaces with underscores, remove special chars
     safe = prompt.lower()
     safe = safe.replace(" ", "_")
     safe = "".join(c for c in safe if c.isalnum() or c == "_")
-    # Limit length
     return safe[:100]
 
 
 def save_lut_metadata(
     output_path: Path,
     prompt: str,
-    is_grayscale: bool,
-    model_type: str,
-    steps: int,
-    batch_size: int,
-    learning_rate: float,
+    config: Config,
 ) -> None:
     """Save metadata JSON file alongside the LUT."""
     metadata: Dict[str, Any] = {
-        "utility": False,
         "prompt": prompt,
-        "black_and_white": is_grayscale,
-        "model": model_type,
-        "settings": {
-            "steps": steps,
-            "lut_size": 16,  # LUT size is fixed to 16
-            "batch_size": batch_size,
-            "learning_rate": learning_rate,
-        },
+        "utility": False,
+        "config": config.to_dict(),
     }
 
     metadata_path = output_path.with_suffix(".json")
@@ -269,20 +243,12 @@ def apply_lut_to_test_image(
 ) -> None:
     """Apply a LUT to a test image and save the result."""
     try:
-        # Load LUT
         lut_tensor, domain_min, domain_max = read_cube_file(str(lut_path))
-
-        # Load test image
         image_tensor = load_image_as_tensor(str(test_image_path))
-
-        # Apply LUT
         result = apply_lut(image_tensor, lut_tensor, domain_min, domain_max)
-
-        # Convert back to PIL and save
         result_np = (result.permute(1, 2, 0).cpu().numpy() * 255).astype("uint8")
         result_img = Image.fromarray(result_np)
         result_img.save(output_path)
-
         print(f"  Saved test image result: {output_path}")
     except Exception as e:
         print(f"  WARNING: Failed to apply LUT to test image: {e}")
@@ -293,19 +259,40 @@ def generate_lut(
     is_grayscale: bool,
     image_folder: Path,
     output_dir: Path,
-    model_type: str = "clip",
-    steps: int = 500,
-    batch_size: int = 4,
-    learning_rate: float = 0.005,
-    image_text_weight: float = 1.0,
+    base_config: Config,
+    steps: int,
+    learning_rate: float,
     test_image: Optional[Path] = None,
     dry_run: bool = False,
 ) -> bool:
     """
     Generate a single LUT using main.py optimize command.
+    Creates a temporary config file with the appropriate representation type.
     Returns True if successful.
     """
     output_path = output_dir / f"{sanitize_filename(prompt)}.cube"
+
+    # Determine representation type based on is_grayscale
+    representation = "bw_lut" if is_grayscale else "lut"
+
+    # Create a modified config for this LUT
+    config = Config(
+        representation=representation,
+        image_text_loss_type=base_config.image_text_loss_type,
+        loss_weights=base_config.loss_weights,
+        representation_args=base_config.representation_args,
+        steps=steps,
+        learning_rate=learning_rate,
+        batch_size=base_config.batch_size,
+    )
+
+    # Create a temporary config file and track it for cleanup
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False
+    ) as tmp_file:
+        config.to_json(tmp_file.name)
+        tmp_config_path = Path(tmp_file.name)
+        _temp_files.add(tmp_config_path)
 
     cmd = [
         "python",
@@ -317,32 +304,22 @@ def generate_lut(
         str(image_folder),
         "--output-path",
         str(output_path),
-        "--model-type",
-        model_type,
-        "--steps",
-        str(steps),
-        "--batch-size",
-        str(batch_size),
-        "--learning-rate",
-        str(learning_rate),
-        "--image-text-weight",
-        str(image_text_weight),
+        "--config",
+        str(tmp_config_path),
     ]
 
-    if is_grayscale:
-        cmd.append("--grayscale")
-
-    # Pass test image to optimization for training visualization
     if test_image:
         cmd.extend(["--test-image", str(test_image)])
 
     if dry_run:
         print(f"[DRY RUN] Would run: {' '.join(cmd)}")
+        tmp_config_path.unlink(missing_ok=True)
+        _temp_files.discard(tmp_config_path)
         return True
 
     print(f"\n{'=' * 80}")
     print(f"Generating LUT: {prompt}")
-    print(f"Grayscale: {is_grayscale}")
+    print(f"Representation: {representation}")
     print(f"Steps: {steps}")
     print(f"Output: {output_path}")
     print(f"{'=' * 80}\n")
@@ -350,20 +327,13 @@ def generate_lut(
     try:
         subprocess.run(cmd, check=True)
 
-        # Save metadata
-        if not dry_run:
-            save_lut_metadata(
-                output_path=output_path,
-                prompt=prompt,
-                is_grayscale=is_grayscale,
-                model_type=model_type,
-                steps=steps,
-                batch_size=batch_size,
-                learning_rate=learning_rate,
-            )
+        save_lut_metadata(
+            output_path=output_path,
+            prompt=prompt,
+            config=config,
+        )
 
-        # Apply LUT to test image if provided
-        if test_image and not dry_run:
+        if test_image:
             test_output_path = output_path.with_suffix(".png")
             apply_lut_to_test_image(output_path, test_image, test_output_path)
 
@@ -371,9 +341,9 @@ def generate_lut(
     except subprocess.CalledProcessError as e:
         print(f"ERROR: Failed to generate LUT for '{prompt}': {e}")
         return False
-
-
-# This is the typer-based main() to replace argparse version in generate_luts.py
+    finally:
+        tmp_config_path.unlink(missing_ok=True)
+        _temp_files.discard(tmp_config_path)
 
 
 @app.command()
@@ -381,6 +351,10 @@ def main(
     image_folder: Annotated[
         Path, typer.Option(help="Folder containing training images")
     ],
+    config: Annotated[
+        str,
+        typer.Option(help="Path to JSON config file"),
+    ] = "configs/color_clip.json",
     output_dir: Annotated[
         Path, typer.Option(help="Directory to save generated LUTs")
     ] = Path("luts"),
@@ -388,81 +362,90 @@ def main(
         Optional[int],
         typer.Option(help="Random sample size (generates this many LUTs total)"),
     ] = None,
-    color_only: Annotated[bool, typer.Option(help="Generate only color LUTs")] = False,
+    bw_percentage: Annotated[
+        float,
+        typer.Option(help="Percentage of LUTs to generate as black & white (0.0-1.0)"),
+    ] = 0.05,
+    color_only: Annotated[
+        bool,
+        typer.Option(help="Only generate color LUTs"),
+    ] = False,
     bw_only: Annotated[
-        bool, typer.Option(help="Generate only black & white LUTs")
+        bool,
+        typer.Option(help="Only generate black & white LUTs"),
     ] = False,
     standalone_only: Annotated[
-        bool, typer.Option(help="Generate only standalone LUTs (movies and directors)")
+        bool,
+        typer.Option(help="Only generate standalone LUTs (movies and directors)"),
     ] = False,
-    model_type: Annotated[str, typer.Option(help="Model to use")] = "clip",
-    steps: Annotated[str, typer.Option(help="Training iterations per LUT")] = "200-600",
-    image_text_weight: Annotated[float, typer.Option(help="Image text weight")] = 1.0,
-    batch_size: Annotated[Optional[int], typer.Option(help="Batch size")] = None,
+    steps: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Training steps (overrides config, supports ranges like 200-600)"
+        ),
+    ] = None,
     learning_rate: Annotated[
-        str, typer.Option(help="Learning rate for optimization (single value or range)")
-    ] = "0.005",
+        Optional[str],
+        typer.Option(
+            help="Learning rate (overrides config, supports ranges like 0.001-0.01)"
+        ),
+    ] = None,
     test_image: Annotated[
         Optional[Path], typer.Option(help="Test image to apply each LUT to")
     ] = None,
     seed: Annotated[
         Optional[int], typer.Option(help="Random seed for reproducible sampling")
     ] = None,
-    bw_percentage: Annotated[
-        float,
-        typer.Option(
-            help="Percentage of black & white LUTs to generate (0.0-1.0, default 0.05 = 5%%)"
-        ),
-    ] = 0.05,
     dry_run: Annotated[
         bool, typer.Option(help="Print commands without executing")
     ] = False,
 ):
     """
-    Batch generate LUTs from reference files.
+    Batch generate LUTs from reference files using a config file.
 
     Examples:
       # Generate 100 random LUTs with 5% B&W (default)
       python scripts/generate_luts.py --image-folder images/ --sample 100 --output-dir luts/
 
       # Generate 100 LUTs with 10% B&W
-      python scripts/generate_luts.py --image-folder images/ --sample 100 --bw-percentage 0.1 --output-dir luts/
+      python scripts/generate_luts.py --image-folder images/ --sample 100 --bw-percentage 0.1
 
-      # Generate with randomized steps between 300-800
-      python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --output-dir luts/
+      # Generate with randomized steps (overrides config)
+      python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800
 
-      # Generate with randomized learning rate between 0.001-0.01
-      python scripts/generate_luts.py --image-folder images/ --sample 50 --learning-rate 0.001-0.01 --output-dir luts/
-
-      # Generate with both randomized steps and learning rate
-      python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --learning-rate 0.001-0.01 --output-dir luts/
+      # Use a different config
+      python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/color_sds.json
     """
     if seed:
         random.seed(seed)
 
-    # Parse steps range
-    min_steps, max_steps = parse_range(steps, int, "steps")
-    if min_steps == max_steps:
-        print(f"Using fixed steps: {min_steps}")
-    else:
-        print(f"Using randomized steps: {min_steps}-{max_steps}")
+    # Load base config
+    base_config = load_config(config)
+    print(f"Loaded config from: {config}")
+    print(f"  Model type: {base_config.image_text_loss_type}")
+    print(f"  Batch size: {base_config.batch_size}")
 
-    # Parse learning rate range
-    min_lr, max_lr = parse_range(learning_rate, float, "learning rate")
-    if min_lr == max_lr:
-        print(f"Using fixed learning rate: {min_lr}")
+    # Parse steps range (use config default if not specified)
+    if steps is None:
+        min_steps = max_steps = base_config.steps
+        print(f"Using config steps: {min_steps}")
     else:
-        print(f"Using randomized learning rate: {min_lr}-{max_lr}")
+        min_steps, max_steps = parse_range(steps, int, "steps")
+        if min_steps == max_steps:
+            print(f"Using fixed steps: {min_steps}")
+        else:
+            print(f"Using randomized steps: {min_steps}-{max_steps}")
 
-    # Auto-adjust batch size based on model type if not specified
-    if batch_size is None:
-        if model_type == "clip":
-            batch_size = 4
-        else:  # sds, gemma3_4b, gemma3_12b, gemma3_27b
-            batch_size = 1
-        print(f"Auto-set batch size to {batch_size} for {model_type}")
+    # Parse learning rate range (use config default if not specified)
+    if learning_rate is None:
+        min_lr = max_lr = base_config.learning_rate
+        print(f"Using config learning rate: {min_lr}")
     else:
-        print(f"Using user-specified batch size: {batch_size}")
+        min_lr, max_lr = parse_range(learning_rate, float, "learning rate")
+        if min_lr == max_lr:
+            print(f"Using fixed learning rate: {min_lr}")
+        else:
+            print(f"Using randomized learning rate: {min_lr}-{max_lr}")
 
     # Load reference files
     prompts_dir = Path(__file__).parent / "prompts"
@@ -478,7 +461,7 @@ def main(
     directors = load_references(prompts_dir / "directors.txt")
     directors_bw = load_references(prompts_dir / "directors_bw.txt")
 
-    print("Loaded references:")
+    print("\nLoaded references:")
     print(f"  Colors: {len(colors)}")
     print(f"  Emotions: {len(emotions)}")
     print(f"  Film formats (color): {len(film_formats)}")
@@ -488,27 +471,24 @@ def main(
     print(f"  Movies (color): {len(movies)}")
     print(f"  Movies (B&W): {len(movies_bw)}")
     print(f"  Directors (color): {len(directors)}")
-    print(f"  Directors (B&W): {len(directors_bw)}\n")
+    print(f"  Directors (B&W): {len(directors_bw)}")
 
     # Generate prompts based on mode
     all_prompts = []
 
     if not bw_only and not standalone_only:
-        # Generate color combination prompts
         color_prompts = generate_color_prompts(
             colors, emotions, film_formats, cities, weather
         )
-        print(f"Generated {len(color_prompts)} color combination prompts")
+        print(f"\nGenerated {len(color_prompts)} color combination prompts")
         all_prompts.extend(color_prompts)
 
     if not color_only and not standalone_only:
-        # Generate B&W prompts
         bw_prompts = generate_bw_prompts(emotions, film_formats_bw, cities, weather)
         print(f"Generated {len(bw_prompts)} B&W prompts")
         all_prompts.extend(bw_prompts)
 
     if not color_only and not bw_only:
-        # Generate standalone prompts (movies + directors)
         standalone_prompts = generate_standalone_prompts(
             movies, directors, movies_bw, directors_bw
         )
@@ -517,22 +497,18 @@ def main(
 
     # Sample if requested, respecting B&W percentage
     if sample and sample < len(all_prompts):
-        # Validate bw_percentage
         if not 0.0 <= bw_percentage <= 1.0:
             print(
                 f"ERROR: bw_percentage must be between 0.0 and 1.0, got {bw_percentage}"
             )
             raise typer.Exit(1)
 
-        # Separate color and B&W prompts
         color_prompts = [p for p in all_prompts if not p[1]]
         bw_prompts = [p for p in all_prompts if p[1]]
 
-        # Calculate how many of each type to sample
         num_bw = int(sample * bw_percentage)
         num_color = sample - num_bw
 
-        # Ensure we don't try to sample more than available
         if num_bw > len(bw_prompts):
             print(
                 f"WARNING: Requested {num_bw} B&W LUTs but only {len(bw_prompts)} available"
@@ -547,14 +523,13 @@ def main(
             num_color = len(color_prompts)
             num_bw = sample - num_color
 
-        # Sample from each category
         sampled_bw = random.sample(bw_prompts, num_bw) if num_bw > 0 else []
         sampled_color = random.sample(color_prompts, num_color) if num_color > 0 else []
 
         all_prompts = sampled_color + sampled_bw
-        random.shuffle(all_prompts)  # Shuffle to mix color and B&W
+        random.shuffle(all_prompts)
 
-        print(f"\nSampled {len(all_prompts)} prompts from total:")
+        print(f"\nSampled {len(all_prompts)} prompts:")
         print(f"  Color: {num_color} ({num_color / len(all_prompts) * 100:.1f}%)")
         print(f"  B&W: {num_bw} ({num_bw / len(all_prompts) * 100:.1f}%)")
 
@@ -570,10 +545,7 @@ def main(
     for i, (prompt, is_grayscale) in enumerate(all_prompts, 1):
         print(f"\n[{i}/{len(all_prompts)}]")
 
-        # Randomize steps for each LUT within the specified range
         steps_value = random.randint(min_steps, max_steps)
-
-        # Randomize learning rate for each LUT within the specified range
         learning_rate_value = random.uniform(min_lr, max_lr)
 
         success = generate_lut(
@@ -581,10 +553,8 @@ def main(
             is_grayscale=is_grayscale,
             image_folder=image_folder,
             output_dir=output_dir,
-            model_type=model_type,
+            base_config=base_config,
             steps=steps_value,
-            batch_size=batch_size,
-            image_text_weight=image_text_weight,
             learning_rate=learning_rate_value,
             test_image=test_image,
             dry_run=dry_run,
@@ -595,7 +565,6 @@ def main(
         else:
             failed += 1
 
-    # Summary
     print(f"\n{'=' * 80}")
     print("BATCH GENERATION COMPLETE")
     print(f"{'=' * 80}")

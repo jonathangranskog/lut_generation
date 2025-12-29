@@ -1,5 +1,6 @@
 """Integration tests for complete LUT optimization and inference workflows."""
 
+import json
 import subprocess
 
 import pytest
@@ -9,16 +10,66 @@ from utils.io import read_cube_file
 from utils.transforms import identity_lut
 
 
+@pytest.fixture
+def test_config_color_clip(temp_dir):
+    """Create a test config for color CLIP with minimal steps."""
+    config_path = temp_dir / "test_color_clip.json"
+    config = {
+        "representation": "lut",
+        "image_text_loss_type": "clip",
+        "loss_weights": {
+            "image_text": 1.0,
+            "image_smoothness": 1.0,
+            "image_regularization": 1.0,
+            "black_preservation": 1.0,
+            "repr_smoothness": 1.0,
+        },
+        "representation_args": {"size": 16},
+        "steps": 5,
+        "learning_rate": 0.005,
+        "batch_size": 4,
+    }
+    with open(config_path, "w") as f:
+        json.dump(config, f)
+    return config_path
+
+
+@pytest.fixture
+def test_config_bw_clip(temp_dir):
+    """Create a test config for B&W CLIP with minimal steps."""
+    config_path = temp_dir / "test_bw_clip.json"
+    config = {
+        "representation": "bw_lut",
+        "image_text_loss_type": "clip",
+        "loss_weights": {
+            "image_text": 1.0,
+            "image_smoothness": 1.0,
+            "image_regularization": 1.0,
+            "black_preservation": 1.0,
+            "repr_smoothness": 1.0,
+        },
+        "representation_args": {"size": 16},
+        "steps": 5,
+        "learning_rate": 0.005,
+        "batch_size": 4,
+    }
+    with open(config_path, "w") as f:
+        json.dump(config, f)
+    return config_path
+
+
 @pytest.mark.integration
 class TestOptimizeWorkflow:
     """Integration tests for the optimize command."""
 
     @pytest.mark.slow
-    def test_optimize_clip_basic(self, sample_image_folder, temp_dir):
+    def test_optimize_clip_basic(
+        self, sample_image_folder, temp_dir, test_config_color_clip
+    ):
         """Test basic CLIP optimization workflow with minimal steps."""
         output_lut = temp_dir / "test_clip.cube"
 
-        # Run optimize command with minimal steps for speed
+        # Run optimize command with config
         cmd = [
             "python",
             "main.py",
@@ -27,10 +78,8 @@ class TestOptimizeWorkflow:
             "warm sunset",
             "--image-folder",
             str(sample_image_folder),
-            "--model-type",
-            "clip",
-            "--steps",
-            "5",  # Very few steps for integration test speed
+            "--config",
+            str(test_config_color_clip),
             "--log-interval",
             "0",  # Disable logging
             "--output-path",
@@ -51,7 +100,7 @@ class TestOptimizeWorkflow:
         assert lut_tensor.min() >= 0.0
         assert lut_tensor.max() <= 1.0
 
-    def test_optimize_validates_empty_folder(self, temp_dir):
+    def test_optimize_validates_empty_folder(self, temp_dir, test_config_color_clip):
         """Test that optimize rejects empty image folders."""
         empty_folder = temp_dir / "empty"
         empty_folder.mkdir()
@@ -64,8 +113,8 @@ class TestOptimizeWorkflow:
             "test",
             "--image-folder",
             str(empty_folder),
-            "--steps",
-            "1",
+            "--config",
+            str(test_config_color_clip),
             "--output-path",
             str(temp_dir / "test.cube"),
         ]
@@ -76,10 +125,24 @@ class TestOptimizeWorkflow:
         assert result.returncode != 0
         assert "No valid images found" in result.stderr
 
-    def test_optimize_with_custom_log_dir(self, sample_image_folder, temp_dir):
+    def test_optimize_with_custom_log_dir(
+        self, sample_image_folder, temp_dir, test_config_color_clip
+    ):
         """Test optimize with custom log directory."""
         output_lut = temp_dir / "test.cube"
         log_dir = temp_dir / "custom_logs"
+
+        # Create a config with 5 steps and log interval of 5
+        config_path = temp_dir / "test_log_config.json"
+        config = {
+            "representation": "lut",
+            "image_text_loss_type": "clip",
+            "steps": 5,
+            "learning_rate": 0.005,
+            "batch_size": 4,
+        }
+        with open(config_path, "w") as f:
+            json.dump(config, f)
 
         cmd = [
             "python",
@@ -89,8 +152,8 @@ class TestOptimizeWorkflow:
             "test",
             "--image-folder",
             str(sample_image_folder),
-            "--steps",
-            "5",
+            "--config",
+            str(config_path),
             "--log-interval",
             "5",
             "--log-dir",
@@ -107,8 +170,10 @@ class TestOptimizeWorkflow:
         log_files = list(log_dir.glob("*.cube")) + list(log_dir.glob("*.png"))
         assert len(log_files) > 0, "No log files created"
 
-    def test_optimize_grayscale(self, sample_image_folder, temp_dir):
-        """Test grayscale LUT optimization."""
+    def test_optimize_grayscale(
+        self, sample_image_folder, temp_dir, test_config_bw_clip
+    ):
+        """Test grayscale LUT optimization using bw_lut config."""
         output_lut = temp_dir / "grayscale.cube"
 
         cmd = [
@@ -119,9 +184,8 @@ class TestOptimizeWorkflow:
             "black and white",
             "--image-folder",
             str(sample_image_folder),
-            "--grayscale",
-            "--steps",
-            "5",
+            "--config",
+            str(test_config_bw_clip),
             "--log-interval",
             "0",
             "--output-path",
@@ -130,7 +194,7 @@ class TestOptimizeWorkflow:
 
         result = subprocess.run(cmd, capture_output=True, text=True)
 
-        assert result.returncode == 0
+        assert result.returncode == 0, f"Command failed: {result.stderr}"
         assert output_lut.exists()
 
         # Load and verify it's a valid grayscale LUT
@@ -222,13 +286,15 @@ class TestEndToEndPipeline:
     """End-to-end pipeline tests combining optimize and infer."""
 
     @pytest.mark.slow
-    def test_optimize_then_infer(self, sample_image_folder, temp_dir):
+    def test_optimize_then_infer(
+        self, sample_image_folder, temp_dir, test_config_color_clip
+    ):
         """Test complete pipeline: optimize a LUT, then use it for inference."""
         lut_file = temp_dir / "pipeline.cube"
         output_image = temp_dir / "result.png"
         test_image = next(sample_image_folder.glob("*.jpg"))
 
-        # Step 1: Optimize a LUT
+        # Step 1: Optimize a LUT using config
         optimize_cmd = [
             "python",
             "main.py",
@@ -237,8 +303,8 @@ class TestEndToEndPipeline:
             "warm golden hour",
             "--image-folder",
             str(sample_image_folder),
-            "--steps",
-            "5",
+            "--config",
+            str(test_config_color_clip),
             "--log-interval",
             "0",
             "--output-path",

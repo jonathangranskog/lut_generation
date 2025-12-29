@@ -41,14 +41,21 @@ uv sync
 python main.py optimize \
   --prompt "golden hour warm sunlight" \
   --image-folder images/ \
-  --steps 500
+  --config configs/color_clip.json
 ```
 
 This will:
 - Load images from `images/`
+- Use the color CLIP configuration (500 steps, learning rate 0.005, batch size 4)
 - Optimize a LUT to make images match the prompt
 - Save training progress to `tmp/training_logs/golden_hour_warm_sunlight/`
 - Save the final LUT to `lut.cube`
+
+Available default configs:
+- `configs/color_clip.json` - Color LUT with CLIP (default)
+- `configs/bw_clip.json` - Black & white LUT with CLIP
+- `configs/color_sds.json` - Color LUT with SDS (DeepFloyd IF)
+- `configs/color_gemma3_12b.json` - Color LUT with Gemma 3 12B
 
 ### 2. Apply a LUT to Images
 
@@ -73,7 +80,11 @@ It will skip the VLM tests if you are not logged in to huggingface or if CUDA is
 python scripts/generate_luts.py --sample 100 --test-image images/IMG_0001.png --image-folder images --output-dir tmp/generated_luts/
 ```
 
-This command generates 100 LUTs automatically using CLIP
+This command generates 100 LUTs automatically using the default color_clip config. You can also specify a different config:
+
+```bash
+python scripts/generate_luts.py --sample 100 --config configs/color_sds.json --image-folder images --output-dir tmp/generated_luts/
+```
 
 ## Commands
 
@@ -88,26 +99,44 @@ python main.py optimize [OPTIONS]
 - `--image-folder PATH`: Folder containing training images
 
 **Key Options:**
-- `--model-type`: Model to use (default: "clip")
-  - `clip`: CLIP ViT-B/32 (RECOMMENDED: fast, great quality, evaluates final image only)
-  - `gemma3_4b`: Gemma 3 4B (fastest VLM, context-aware transformations)
-  - `gemma3_12b`: Gemma 3 12B (balanced, recommended for VLM)
-  - `gemma3_27b`: Gemma 3 27B (highest quality, slowest)
-  - `sds`: Score Distillation Sampling with DeepFloyd IF (pixel-space diffusion model)
-  - Note: Gemma models compare original vs transformed images. They work best for precise minute LUTs.
-- `--steps INT`: Training iterations (default: 500)
-- `--learning-rate FLOAT`: Learning rate (default: 0.005)
-- `--grayscale`: Optimize a black-and-white LUT (single channel) that outputs same intensity for RGB (default: False)
-- `--image-text-weight FLOAT`: Weight of the text prompt loss
-- `--image-smoothness FLOAT`: Image-space anti-banding strength (default: 1.0)
-- `--image-regularization FLOAT`: Keep changes subtle (default: 1.0)
-- `--black-preservation FLOAT`: Retain black values to reduce fading (default: 1.0)
-- `--repr-smoothness FLOAT`: Representation-space anti-banding strength (default: 1.0)
-- `--batch-size INT`: Batch size (default: 4)
+- `--config PATH`: Path to JSON config file (default: "configs/color_clip.json")
 - `--log-interval INT`: Save progress every N steps (default: 50, 0 to disable)
 - `--output-path PATH`: Output .cube file (default: "lut.cube")
 - `--test-image PATH`: Image to apply LUT to during logging (repeat flag for multiple images, default picks a random training image)
 - `--verbose`: Show detailed loss breakdown every 10 steps
+- `--log-dir PATH`: Custom directory for training logs
+
+**Config File Format:**
+
+Config files are JSON files that specify all training parameters:
+
+```json
+{
+  "representation": "lut",
+  "image_text_loss_type": "clip",
+  "loss_weights": {
+    "image_text": 1.0,
+    "image_smoothness": 1.0,
+    "image_regularization": 1.0,
+    "black_preservation": 1.0,
+    "repr_smoothness": 1.0
+  },
+  "representation_args": {
+    "size": 16
+  },
+  "steps": 500,
+  "learning_rate": 0.005,
+  "batch_size": 4
+}
+```
+
+- `representation`: "lut" for color or "bw_lut" for black & white
+- `image_text_loss_type`: "clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", or "sds"
+- `loss_weights`: Weight for each loss component
+- `representation_args`: Representation-specific arguments (e.g., `{"size": 16}` for LUT representations)
+- `steps`: Number of training iterations
+- `learning_rate`: Optimizer learning rate
+- `batch_size`: Training batch size
 
 **Examples:**
 
@@ -116,20 +145,19 @@ Standard color LUT with CLIP:
 python main.py optimize \
   --prompt "cinematic teal and orange" \
   --image-folder images/ \
-  --model-type clip \
+  --config configs/color_clip.json \
   --output-path cinematic.cube \
   --test-image photo1.jpg \
   --test-image photo2.jpg \
   --verbose
 ```
 
-VLM with context-aware transformations:
+VLM with context-aware transformations (Gemma 3 12B):
 ```bash
 python main.py optimize \
   --prompt "warm golden hour" \
   --image-folder images/ \
-  --model-type gemma3_12b \
-  --batch-size 1 \
+  --config configs/color_gemma3_12b.json \
   --output-path golden_hour.cube
 ```
 
@@ -138,19 +166,16 @@ SDS with DeepFloyd IF:
 python main.py optimize \
   --prompt "kodak portra 400 film" \
   --image-folder images/ \
-  --model-type sds \
-  --output-path portra.cube \
-  --image-text-weight 10.0 \
-  --batch-size 1
+  --config configs/color_sds.json \
+  --output-path portra.cube
 ```
 
-Black-and-white LUT with grayscale optimization:
+Black-and-white LUT with CLIP:
 ```bash
 python main.py optimize \
   --prompt "black and white noir film" \
   --image-folder images/ \
-  --grayscale \
-  --steps 500 \
+  --config configs/bw_clip.json \
   --output-path noir_bw.cube
 ```
 
