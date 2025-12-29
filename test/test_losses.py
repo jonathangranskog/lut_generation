@@ -13,6 +13,17 @@ from utils.losses import (
 )
 
 
+class MockRepresentation:
+    """Mock representation for testing compute_losses."""
+
+    def __init__(self, lut_tensor):
+        self.lut_tensor = lut_tensor
+
+    def smoothness_loss(self):
+        """Mock smoothness loss."""
+        return lut_smoothness_loss(self.lut_tensor)
+
+
 class TestImageSmoothnessLoss:
     """Test image smoothness loss function."""
 
@@ -298,17 +309,18 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=2.0,
             image_smoothness=0.0,
             image_regularization=0.0,
             black_preservation=0.0,
-            lut_smoothness=0.0,
+            repr_smoothness=0.0,
         )
 
         assert torch.isclose(loss, torch.tensor(2.0)), (
@@ -326,17 +338,18 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=1.0,
             image_smoothness=0.1,
             image_regularization=0.2,
             black_preservation=0.3,
-            lut_smoothness=0.4,
+            repr_smoothness=0.4,
         )
 
         # Should have all components
@@ -344,7 +357,7 @@ class TestComputeLosses:
         assert "img_smooth" in components
         assert "img_reg" in components
         assert "black" in components
-        assert "lut_smooth" in components
+        assert "repr_smooth" in components
         assert len(components) == 5
 
         # Total loss should be sum of weighted components
@@ -353,7 +366,7 @@ class TestComputeLosses:
             + 0.1 * components["img_smooth"]
             + 0.2 * components["img_reg"]
             + 0.3 * components["black"]
-            + 0.4 * components["lut_smooth"]
+            + 0.4 * components["repr_smooth"]
         )
         assert torch.isclose(loss, expected_loss, atol=1e-6), (
             "Total loss should be sum of weighted components"
@@ -368,23 +381,24 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
-        # Enable only image smoothness and LUT smoothness
+        # Enable only image smoothness and representation smoothness
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=1.0,
             image_smoothness=0.5,
             image_regularization=0.0,
             black_preservation=0.0,
-            lut_smoothness=0.5,
+            repr_smoothness=0.5,
         )
 
         assert "primary" in components
         assert "img_smooth" in components
-        assert "lut_smooth" in components
+        assert "repr_smooth" in components
         assert "img_reg" not in components, "Disabled loss should not be in components"
         assert "black" not in components, "Disabled loss should not be in components"
         assert len(components) == 3
@@ -398,17 +412,18 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64, requires_grad=True)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3, requires_grad=True)
+        representation = MockRepresentation(lut)
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=1.0,
             image_smoothness=0.1,
             image_regularization=0.1,
             black_preservation=0.1,
-            lut_smoothness=0.1,
+            repr_smoothness=0.1,
         )
 
         loss.backward()
@@ -427,17 +442,18 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=1.0,
             image_smoothness=0.0,
             image_regularization=0.0,
             black_preservation=0.0,
-            lut_smoothness=0.0,
+            repr_smoothness=0.0,
         )
 
         # Only primary should be present
@@ -464,25 +480,26 @@ class TestComputeLosses:
         transformed = torch.rand(2, 3, 64, 64)
         original = torch.rand(2, 3, 64, 64)
         lut = torch.rand(16, 16, 16, 3)
+        representation = MockRepresentation(lut)
 
         (
             image_text_weight,
             image_smoothness,
             image_regularization,
             black_preservation,
-            lut_smoothness_weight,
+            repr_smoothness_weight,
         ) = weights
 
         loss, components = compute_losses(
             loss_fn=mock_loss_fn,
             transformed_images=transformed,
             original_images=original,
-            lut_tensor=lut,
+            representation=representation,
             image_text_weight=image_text_weight,
             image_smoothness=image_smoothness,
             image_regularization=image_regularization,
             black_preservation=black_preservation,
-            lut_smoothness=lut_smoothness_weight,
+            repr_smoothness=repr_smoothness_weight,
         )
 
         assert not torch.isnan(loss), "Loss should not be NaN"

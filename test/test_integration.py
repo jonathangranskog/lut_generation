@@ -31,8 +31,6 @@ class TestOptimizeWorkflow:
             "clip",
             "--steps",
             "5",  # Very few steps for integration test speed
-            "--lut-size",
-            "8",  # Small LUT for speed
             "--log-interval",
             "0",  # Disable logging
             "--output-path",
@@ -49,33 +47,9 @@ class TestOptimizeWorkflow:
 
         # Verify LUT can be loaded
         lut_tensor, domain_min, domain_max = read_cube_file(str(output_lut))
-        assert lut_tensor.shape == (8, 8, 8, 3)
+        assert lut_tensor.shape == (16, 16, 16, 3)
         assert lut_tensor.min() >= 0.0
         assert lut_tensor.max() <= 1.0
-
-    def test_optimize_validates_lut_size(self, sample_image_folder, temp_dir):
-        """Test that optimize rejects invalid LUT sizes."""
-        cmd = [
-            "python",
-            "main.py",
-            "optimize",
-            "--prompt",
-            "test",
-            "--image-folder",
-            str(sample_image_folder),
-            "--lut-size",
-            "7",  # Invalid size
-            "--steps",
-            "1",
-            "--output-path",
-            str(temp_dir / "test.cube"),
-        ]
-
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        # Should fail with error about LUT size
-        assert result.returncode != 0
-        assert "LUT size must be one of" in result.stderr
 
     def test_optimize_validates_empty_folder(self, temp_dir):
         """Test that optimize rejects empty image folders."""
@@ -117,8 +91,6 @@ class TestOptimizeWorkflow:
             str(sample_image_folder),
             "--steps",
             "5",
-            "--lut-size",
-            "8",
             "--log-interval",
             "5",
             "--log-dir",
@@ -150,8 +122,6 @@ class TestOptimizeWorkflow:
             "--grayscale",
             "--steps",
             "5",
-            "--lut-size",
-            "8",
             "--log-interval",
             "0",
             "--output-path",
@@ -269,8 +239,6 @@ class TestEndToEndPipeline:
             str(sample_image_folder),
             "--steps",
             "5",
-            "--lut-size",
-            "8",
             "--log-interval",
             "0",
             "--output-path",

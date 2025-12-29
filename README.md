@@ -95,7 +95,6 @@ python main.py optimize [OPTIONS]
   - `gemma3_27b`: Gemma 3 27B (highest quality, slowest)
   - `sds`: Score Distillation Sampling with DeepFloyd IF (pixel-space diffusion model)
   - Note: Gemma models compare original vs transformed images. They work best for precise minute LUTs.
-- `--lut-size INT`: LUT resolution (default: 16). Higher = more detailed, but more prone to banding artifacts
 - `--steps INT`: Training iterations (default: 500)
 - `--learning-rate FLOAT`: Learning rate (default: 0.005)
 - `--grayscale`: Optimize a black-and-white LUT (single channel) that outputs same intensity for RGB (default: False)
@@ -103,7 +102,7 @@ python main.py optimize [OPTIONS]
 - `--image-smoothness FLOAT`: Image-space anti-banding strength (default: 1.0)
 - `--image-regularization FLOAT`: Keep changes subtle (default: 1.0)
 - `--black-preservation FLOAT`: Retain black values to reduce fading (default: 1.0)
-- `--lut-smoothness FLOAT`: LUT-space anti-banding strength (default: 1.0)
+- `--repr-smoothness FLOAT`: Representation-space anti-banding strength (default: 1.0)
 - `--batch-size INT`: Batch size (default: 4)
 - `--log-interval INT`: Save progress every N steps (default: 50, 0 to disable)
 - `--output-path PATH`: Output .cube file (default: "lut.cube")
@@ -158,11 +157,11 @@ python main.py optimize \
 ### `infer` - Apply a LUT
 
 ```bash
-python main.py infer LUT_FILE IMAGE_FILE [OPTIONS]
+python main.py infer CKPT_PATH IMAGE_FILE [OPTIONS]
 ```
 
 **Arguments:**
-- `LUT_FILE`: Path to .cube file
+- `CKPT_PATH`: Path to .cube file
 - `IMAGE_FILE`: Path to input image
 
 **Options:**
@@ -186,11 +185,11 @@ During optimization, the total loss consists of:
 2. **Image Smoothness** (0.0-0.01): Prevents banding and posterization
 3. **Image Regularization** (0.0-0.1): Keeps output close to input (subtle changes)
 4. **Black Preservation** (~0.0-0.0001): Retains black levels
-5. **LUT Smoothness** (~0.0-0.01): Prevents banding in LUT-space
+5. **Repr Smoothness** (~0.0-0.01): Prevents banding in representation-space
 
 Watch the verbose output to see how each contributes:
 ```
-Step 100: Loss = 0.7935 (CLIP: 0.7905, Smooth: 0.0004, Reg: 0.0017, Black: 0.0000, LUT Smooth: 0.0008)
+Step 100: Loss = 0.7935 (CLIP: 0.7905, Smooth: 0.0004, Reg: 0.0017, Black: 0.0000, Repr Smooth: 0.0008)
 ```
 
 # Limitations
