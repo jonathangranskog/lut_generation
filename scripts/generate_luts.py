@@ -222,24 +222,13 @@ def sanitize_filename(prompt: str) -> str:
 def save_lut_metadata(
     output_path: Path,
     prompt: str,
-    is_grayscale: bool,
     config: Config,
-    steps: int,
-    learning_rate: float,
 ) -> None:
     """Save metadata JSON file alongside the LUT."""
     metadata: Dict[str, Any] = {
-        "utility": False,
         "prompt": prompt,
-        "representation": config.representation,
-        "black_and_white": is_grayscale,
-        "model": config.image_text_loss_type,
-        "settings": {
-            "steps": steps,
-            "size": config.representation_args.get("size", 16),
-            "batch_size": config.batch_size,
-            "learning_rate": learning_rate,
-        },
+        "utility": False,
+        "config": config.to_dict(),
     }
 
     metadata_path = output_path.with_suffix(".json")
@@ -341,10 +330,7 @@ def generate_lut(
         save_lut_metadata(
             output_path=output_path,
             prompt=prompt,
-            is_grayscale=is_grayscale,
             config=config,
-            steps=steps,
-            learning_rate=learning_rate,
         )
 
         if test_image:
