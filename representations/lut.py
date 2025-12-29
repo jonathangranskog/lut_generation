@@ -1,6 +1,5 @@
 """LUT-based representations for color transformation."""
 
-from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,25 +7,14 @@ from .base import BaseRepresentation
 
 
 class LUT(BaseRepresentation):
-    """3D Look-Up Table representation for color transformation.
-
-    Stores a 3D LUT of shape (size, size, size, 3) where the spatial indexing
-    is [R][G][B] and each position stores the output RGB value.
-    """
+    """3D LUT representation with shape (size, size, size, 3)."""
 
     def __init__(self, size: int = 32, initialize_identity: bool = True):
-        """Initialize a LUT representation.
-
-        Args:
-            size: Resolution of the LUT cube (e.g., 8, 16, 32, 64)
-            initialize_identity: If True, initialize as identity LUT
-        """
         super().__init__()
         self.size = size
         self.domain_min = [0.0, 0.0, 0.0]
         self.domain_max = [1.0, 1.0, 1.0]
 
-        # Create the LUT tensor as a learnable parameter
         if initialize_identity:
             lut_data = self._create_identity_lut()
         else:
@@ -35,47 +23,24 @@ class LUT(BaseRepresentation):
         self.lut_tensor = nn.Parameter(lut_data, requires_grad=True)
 
     def _create_identity_lut(self) -> torch.Tensor:
-        """Create an identity LUT where output equals input.
-
-        Returns:
-            torch.Tensor: Identity LUT of shape (size, size, size, 3)
-        """
         coords = torch.linspace(0, 1, self.size)
-        # Create identity LUT: at spatial position [r,g,b], store RGB value [r,g,b]
         r, g, b = torch.meshgrid(coords, coords, coords, indexing="ij")
-        identity_lut = torch.stack([r, g, b], dim=-1)  # (size, size, size, 3)
-        return identity_lut
+        return torch.stack([r, g, b], dim=-1)
 
     def smoothness_loss(self) -> torch.Tensor:
-        """Compute smoothness loss using downsampling-upsampling.
-
-        Returns:
-            torch.Tensor: Scalar smoothness loss
-        """
         smoothed_lut = self._downsample_upsample_3d(self.lut_tensor)
         return F.mse_loss(self.lut_tensor, smoothed_lut)
 
     def _downsample_upsample_3d(
         self, lut: torch.Tensor, scale_factor: float = 0.5
     ) -> torch.Tensor:
-        """Apply downsampling-upsampling smoothing to a 3D LUT.
-
-        Args:
-            lut: LUT tensor of shape (D, H, W, C)
-            scale_factor: Downsampling factor (default 0.5)
-
-        Returns:
-            torch.Tensor: Smoothed LUT of same shape
-        """
         original_shape = lut.shape
-        num_channels = original_shape[-1]  # Can be 1 or 3
+        num_channels = original_shape[-1]
 
-        # Reshape from (D, H, W, C) to (1, C, D, H, W) for interpolation
         lut_reshaped = lut.permute(3, 0, 1, 2).view(
             1, num_channels, original_shape[0], original_shape[1], original_shape[2]
         )
 
-        # Downsample then upsample for smoothing effect
         lut_downsampled = F.interpolate(
             lut_reshaped, scale_factor=scale_factor, mode="trilinear"
         )
@@ -85,7 +50,6 @@ class LUT(BaseRepresentation):
             mode="trilinear",
         )
 
-        # Reshape back to original format (D, H, W, C)
         lut_result = (
             lut_upsampled[0]
             .permute(1, 2, 3, 0)
@@ -94,22 +58,11 @@ class LUT(BaseRepresentation):
         return lut_result
 
     def forward(self, images: torch.Tensor, training: bool = False) -> torch.Tensor:
-        """Apply the LUT to a batch of images.
-
-        Args:
-            images: Input images of shape (B, H, W, C) or (B, C, H, W) in range [0, 1]
-            training: Whether in training mode (skip postprocessing if True)
-
-        Returns:
-            torch.Tensor: Transformed images of the same shape as input
-        """
-        # Use postprocessed LUT if not in training mode
         if not training:
             lut_to_use = self.postprocess(self.lut_tensor)
         else:
             lut_to_use = self.lut_tensor
 
-        # Apply the LUT using trilinear interpolation
         return self._apply_lut(images, lut_to_use, self.domain_min, self.domain_max)
 
     def _apply_lut(
@@ -119,17 +72,6 @@ class LUT(BaseRepresentation):
         domain_min: list[float],
         domain_max: list[float],
     ) -> torch.Tensor:
-        """Apply a 3D LUT using trilinear interpolation.
-
-        Args:
-            image: Input image tensor (B, H, W, C) or (B, C, H, W)
-            lut_tensor: LUT tensor of shape (size, size, size, 3) or (size, size, size, 1)
-            domain_min: Minimum domain values for scaling
-            domain_max: Maximum domain values for scaling
-
-        Returns:
-            torch.Tensor: LUT-applied images in the same format as input
-        """
         is_batched = image.ndim == 4
 
         # Normalize to (B, H, W, C) format
@@ -205,14 +147,6 @@ class LUT(BaseRepresentation):
 
     @classmethod
     def read(cls, file_path: str) -> "LUT":
-        """Load a LUT from a .cube file.
-
-        Args:
-            file_path: Path to the .cube file
-
-        Returns:
-            LUT: Loaded LUT instance
-        """
         import re
         import numpy as np
 
@@ -284,12 +218,6 @@ class LUT(BaseRepresentation):
 
     @torch.no_grad()
     def write(self, file_path: str, title: str = "Generated LUT") -> None:
-        """Save the LUT to a .cube file.
-
-        Args:
-            file_path: Path to save the .cube file
-            title: Title for the LUT file
-        """
         # Apply postprocessing and get a smoothed copy
         lut_tensor = self.postprocess(self.lut_tensor).detach()
 
@@ -334,39 +262,16 @@ class LUT(BaseRepresentation):
                 f.write(f"{rgb[0]:.6f} {rgb[1]:.6f} {rgb[2]:.6f}\n")
 
     def postprocess(self, tensor: torch.Tensor) -> torch.Tensor:
-        """Apply postprocessing (smoothing) to the LUT.
-
-        This applies a downsampling-upsampling smoothing operation.
-
-        Args:
-            tensor: LUT tensor to postprocess.
-
-        Returns:
-            torch.Tensor: Smoothed version of the LUT tensor.
-        """
         return self._downsample_upsample_3d(tensor)
 
     def clamp(self) -> None:
-        """Clamp LUT values to valid range [0, 1]."""
         self.lut_tensor.clamp_(0, 1)
 
 
 class BWLUT(LUT):
-    """Black-and-white (grayscale) LUT representation.
-
-    Stores a single-channel LUT of shape (size, size, size, 1) where each
-    position stores the luminance value. During inference, the single channel
-    is replicated to 3 channels to produce grayscale output.
-    """
+    """Black-and-white (grayscale) LUT representation with shape (size, size, size, 1)."""
 
     def __init__(self, size: int = 32, initialize_identity: bool = True):
-        """Initialize a black-and-white LUT representation.
-
-        Args:
-            size: Resolution of the LUT cube (e.g., 8, 16, 32, 64)
-            initialize_identity: If True, initialize as identity grayscale LUT
-        """
-        # Don't call super().__init__() yet, we'll override lut_tensor creation
         nn.Module.__init__(self)
         self.size = size
         self.domain_min = [0.0, 0.0, 0.0]
@@ -381,11 +286,6 @@ class BWLUT(LUT):
         self.lut_tensor = nn.Parameter(lut_data, requires_grad=True)
 
     def _create_identity_grayscale_lut(self) -> torch.Tensor:
-        """Create an identity grayscale LUT using Rec. 709 luminance.
-
-        Returns:
-            torch.Tensor: Identity grayscale LUT of shape (size, size, size, 1)
-        """
         # Rec. 709 luma coefficients
         REC709_LUMA_R = 0.2126
         REC709_LUMA_G = 0.7152
