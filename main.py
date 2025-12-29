@@ -13,7 +13,6 @@ import os
 import random
 import re
 from pathlib import Path
-from typing import Literal
 
 import torch
 import typer
@@ -30,14 +29,14 @@ from utils import (
     CLIP_IMAGE_SIZE,
     DEEPFLOYD_IMAGE_SIZE,
     VLM_IMAGE_SIZE,
+    Config,
     ImageDataset,
     compute_losses,
     get_device,
+    load_config,
     load_image_as_tensor,
     save_tensor_as_image,
 )
-
-ModelType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", "sds"]
 
 # Configure logging
 logging.basicConfig(
@@ -152,47 +151,52 @@ def save_training_checkpoint(
 def optimize(
     prompt: Annotated[str, typer.Option(help="The prompt to optimize the LUT for.")],
     image_folder: Annotated[str, typer.Option(help="Dataset folder of images")],
-    model_type: Annotated[
-        ModelType,
-        typer.Option(
-            help="Model type: clip, gemma3_4b, gemma3_12b, gemma3_27b, or sds"
-        ),
-    ] = "clip",
-    steps: int = 500,
-    batch_size: int = 4,
-    learning_rate: float = 5e-3,
-    image_text_weight: float = 1.0,
-    image_smoothness: float = 1.0,
-    image_regularization: float = 1.0,
-    black_preservation: float = 1.0,
-    repr_smoothness: float = 1.0,
+    config: Annotated[
+        str,
+        typer.Option(help="Path to JSON config file"),
+    ] = "configs/color_clip.json",
     log_interval: int = 50,
     verbose: bool = False,
     output_path: str = "lut.cube",
     test_image: list[str] | None = None,
-    grayscale: bool = False,
     log_dir: str | None = None,
 ) -> None:
     """
     Optimize a LUT given a small dataset of images and a prompt.
 
-    Image text weight controls the contribution of the main image-text alignment loss (CLIP or Gemma 3).
-    Image smoothness penalizes banding and discontinuities in output images.
-    Image regularization keeps output images close to input images (subtle changes).
-    Black preservation prevents faded/lifted blacks (maintains deep shadows).
+    Uses a JSON config file to specify representation type, loss weights, training parameters, etc.
+    Default configs are provided in the configs/ directory:
+    - configs/color_clip.json: Color LUT with CLIP
+    - configs/bw_clip.json: Black & white LUT with CLIP
+    - configs/color_sds.json: Color LUT with SDS
+    - configs/color_gemma3_12b.json: Color LUT with Gemma 3 12B
+
     Every log_interval steps, saves LUT and sample image to training logs directory.
-    Grayscale optimizes a black-and-white LUT (single channel) that outputs same intensity for RGB.
     Log directory can be customized via --log-dir (default: tmp/training_logs/<sanitized_prompt>/).
 
     Note: Gemma 3 models use comparison mode by default, evaluating transformations by comparing
     original and transformed images for more context-aware color grading.
     """
+    # Load config
+    cfg = load_config(config)
+    logger.info(f"Loaded config from {config}")
+
+    # Extract config values
+    model_type = cfg.image_text_loss_type
+    steps = cfg.steps
+    batch_size = cfg.batch_size
+    learning_rate = cfg.learning_rate
+    image_text_weight = cfg.loss_weights.image_text
+    image_smoothness = cfg.loss_weights.image_smoothness
+    image_regularization = cfg.loss_weights.image_regularization
+    black_preservation = cfg.loss_weights.black_preservation
+    repr_smoothness = cfg.loss_weights.repr_smoothness
+    lut_size = cfg.representation_args.lut_size
+    grayscale = cfg.representation == "bw_lut"
+
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
     logger.info(f"Using device: {device}")
-
-    # LUT size is fixed to 16
-    lut_size = 16
 
     # Select image size based on model type
     if model_type == "clip":

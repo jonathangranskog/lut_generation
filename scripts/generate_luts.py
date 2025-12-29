@@ -9,6 +9,7 @@ import json
 import random
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
 
@@ -19,6 +20,7 @@ from typing_extensions import Annotated
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from utils.config import Config, load_config
 from utils.io import read_cube_file, load_image_as_tensor
 from utils.transforms import apply_lut
 
@@ -293,11 +295,9 @@ def generate_lut(
     is_grayscale: bool,
     image_folder: Path,
     output_dir: Path,
-    model_type: str = "clip",
+    base_config: Config,
     steps: int = 500,
-    batch_size: int = 4,
     learning_rate: float = 0.005,
-    image_text_weight: float = 1.0,
     test_image: Optional[Path] = None,
     dry_run: bool = False,
 ) -> bool:
@@ -306,6 +306,24 @@ def generate_lut(
     Returns True if successful.
     """
     output_path = output_dir / f"{sanitize_filename(prompt)}.cube"
+
+    # Create a modified config for this LUT
+    config = Config(
+        representation="bw_lut" if is_grayscale else "lut",
+        image_text_loss_type=base_config.image_text_loss_type,
+        loss_weights=base_config.loss_weights,
+        representation_args=base_config.representation_args,
+        steps=steps,
+        learning_rate=learning_rate,
+        batch_size=base_config.batch_size,
+    )
+
+    # Create a temporary config file
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False
+    ) as tmp_file:
+        config.to_json(tmp_file.name)
+        tmp_config_path = tmp_file.name
 
     cmd = [
         "python",
@@ -317,20 +335,9 @@ def generate_lut(
         str(image_folder),
         "--output-path",
         str(output_path),
-        "--model-type",
-        model_type,
-        "--steps",
-        str(steps),
-        "--batch-size",
-        str(batch_size),
-        "--learning-rate",
-        str(learning_rate),
-        "--image-text-weight",
-        str(image_text_weight),
+        "--config",
+        tmp_config_path,
     ]
-
-    if is_grayscale:
-        cmd.append("--grayscale")
 
     # Pass test image to optimization for training visualization
     if test_image:
@@ -338,6 +345,8 @@ def generate_lut(
 
     if dry_run:
         print(f"[DRY RUN] Would run: {' '.join(cmd)}")
+        # Clean up temp file
+        Path(tmp_config_path).unlink(missing_ok=True)
         return True
 
     print(f"\n{'=' * 80}")
@@ -356,9 +365,9 @@ def generate_lut(
                 output_path=output_path,
                 prompt=prompt,
                 is_grayscale=is_grayscale,
-                model_type=model_type,
+                model_type=base_config.image_text_loss_type,
                 steps=steps,
-                batch_size=batch_size,
+                batch_size=base_config.batch_size,
                 learning_rate=learning_rate,
             )
 
@@ -371,9 +380,9 @@ def generate_lut(
     except subprocess.CalledProcessError as e:
         print(f"ERROR: Failed to generate LUT for '{prompt}': {e}")
         return False
-
-
-# This is the typer-based main() to replace argparse version in generate_luts.py
+    finally:
+        # Clean up temp file
+        Path(tmp_config_path).unlink(missing_ok=True)
 
 
 @app.command()
@@ -381,6 +390,10 @@ def main(
     image_folder: Annotated[
         Path, typer.Option(help="Folder containing training images")
     ],
+    config: Annotated[
+        str,
+        typer.Option(help="Path to base JSON config file"),
+    ] = "configs/color_clip.json",
     output_dir: Annotated[
         Path, typer.Option(help="Directory to save generated LUTs")
     ] = Path("luts"),
@@ -395,13 +408,12 @@ def main(
     standalone_only: Annotated[
         bool, typer.Option(help="Generate only standalone LUTs (movies and directors)")
     ] = False,
-    model_type: Annotated[str, typer.Option(help="Model to use")] = "clip",
-    steps: Annotated[str, typer.Option(help="Training iterations per LUT")] = "200-600",
-    image_text_weight: Annotated[float, typer.Option(help="Image text weight")] = 1.0,
-    batch_size: Annotated[Optional[int], typer.Option(help="Batch size")] = None,
+    steps: Annotated[
+        str, typer.Option(help="Training iterations per LUT (overrides config, supports ranges like 200-600)")
+    ] = None,
     learning_rate: Annotated[
-        str, typer.Option(help="Learning rate for optimization (single value or range)")
-    ] = "0.005",
+        str, typer.Option(help="Learning rate for optimization (overrides config, supports ranges like 0.001-0.01)")
+    ] = None,
     test_image: Annotated[
         Optional[Path], typer.Option(help="Test image to apply each LUT to")
     ] = None,
@@ -419,50 +431,56 @@ def main(
     ] = False,
 ):
     """
-    Batch generate LUTs from reference files.
+    Batch generate LUTs from reference files using a config file.
 
     Examples:
-      # Generate 100 random LUTs with 5% B&W (default)
+      # Generate 100 random LUTs with 5% B&W using default color_clip config
       python scripts/generate_luts.py --image-folder images/ --sample 100 --output-dir luts/
+
+      # Generate using SDS config
+      python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/color_sds.json
 
       # Generate 100 LUTs with 10% B&W
       python scripts/generate_luts.py --image-folder images/ --sample 100 --bw-percentage 0.1 --output-dir luts/
 
-      # Generate with randomized steps between 300-800
+      # Generate with randomized steps between 300-800 (overrides config)
       python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --output-dir luts/
 
-      # Generate with randomized learning rate between 0.001-0.01
+      # Generate with randomized learning rate between 0.001-0.01 (overrides config)
       python scripts/generate_luts.py --image-folder images/ --sample 50 --learning-rate 0.001-0.01 --output-dir luts/
-
-      # Generate with both randomized steps and learning rate
-      python scripts/generate_luts.py --image-folder images/ --sample 50 --steps 300-800 --learning-rate 0.001-0.01 --output-dir luts/
     """
     if seed:
         random.seed(seed)
 
-    # Parse steps range
-    min_steps, max_steps = parse_range(steps, int, "steps")
-    if min_steps == max_steps:
-        print(f"Using fixed steps: {min_steps}")
-    else:
-        print(f"Using randomized steps: {min_steps}-{max_steps}")
+    # Load base config
+    base_config = load_config(config)
+    print(f"Loaded base config from: {config}")
+    print(f"  Model type: {base_config.image_text_loss_type}")
+    print(f"  Batch size: {base_config.batch_size}")
+    print(f"  Default steps: {base_config.steps}")
+    print(f"  Default learning rate: {base_config.learning_rate}")
 
-    # Parse learning rate range
-    min_lr, max_lr = parse_range(learning_rate, float, "learning rate")
-    if min_lr == max_lr:
-        print(f"Using fixed learning rate: {min_lr}")
+    # Parse steps range (use config default if not specified)
+    if steps is None:
+        min_steps = max_steps = base_config.steps
+        print(f"Using config steps: {min_steps}")
     else:
-        print(f"Using randomized learning rate: {min_lr}-{max_lr}")
+        min_steps, max_steps = parse_range(steps, int, "steps")
+        if min_steps == max_steps:
+            print(f"Using fixed steps: {min_steps}")
+        else:
+            print(f"Using randomized steps: {min_steps}-{max_steps}")
 
-    # Auto-adjust batch size based on model type if not specified
-    if batch_size is None:
-        if model_type == "clip":
-            batch_size = 4
-        else:  # sds, gemma3_4b, gemma3_12b, gemma3_27b
-            batch_size = 1
-        print(f"Auto-set batch size to {batch_size} for {model_type}")
+    # Parse learning rate range (use config default if not specified)
+    if learning_rate is None:
+        min_lr = max_lr = base_config.learning_rate
+        print(f"Using config learning rate: {min_lr}")
     else:
-        print(f"Using user-specified batch size: {batch_size}")
+        min_lr, max_lr = parse_range(learning_rate, float, "learning rate")
+        if min_lr == max_lr:
+            print(f"Using fixed learning rate: {min_lr}")
+        else:
+            print(f"Using randomized learning rate: {min_lr}-{max_lr}")
 
     # Load reference files
     prompts_dir = Path(__file__).parent / "prompts"
@@ -581,10 +599,8 @@ def main(
             is_grayscale=is_grayscale,
             image_folder=image_folder,
             output_dir=output_dir,
-            model_type=model_type,
+            base_config=base_config,
             steps=steps_value,
-            batch_size=batch_size,
-            image_text_weight=image_text_weight,
             learning_rate=learning_rate_value,
             test_image=test_image,
             dry_run=dry_run,

@@ -1,0 +1,17 @@
+{
+  "representation": "lut",
+  "image_text_loss_type": "clip",
+  "loss_weights": {
+    "image_text": 1.0,
+    "image_smoothness": 1.0,
+    "image_regularization": 1.0,
+    "black_preservation": 1.0,
+    "repr_smoothness": 1.0
+  },
+  "representation_args": {
+    "lut_size": 16
+  },
+  "steps": 500,
+  "learning_rate": 0.005,
+  "batch_size": 4
+}
