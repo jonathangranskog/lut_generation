@@ -9,7 +9,7 @@
     "repr_smoothness": 1.0
   },
   "representation_args": {
-    "lut_size": 16
+    "size": 16
   },
   "steps": 500,
   "learning_rate": 0.005,

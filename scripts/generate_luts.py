@@ -234,7 +234,7 @@ def save_lut_metadata(
         "model": config.image_text_loss_type,
         "settings": {
             "steps": steps,
-            "lut_size": config.representation_args.get("lut_size", 16),
+            "size": config.representation_args.get("size", 16),
             "batch_size": config.batch_size,
             "learning_rate": learning_rate,
         },

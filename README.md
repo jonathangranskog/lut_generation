@@ -122,7 +122,7 @@ Config files are JSON files that specify all training parameters:
     "repr_smoothness": 1.0
   },
   "representation_args": {
-    "lut_size": 16
+    "size": 16
   },
   "steps": 500,
   "learning_rate": 0.005,
@@ -133,7 +133,7 @@ Config files are JSON files that specify all training parameters:
 - `representation`: "lut" for color or "bw_lut" for black & white
 - `image_text_loss_type`: "clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", or "sds"
 - `loss_weights`: Weight for each loss component
-- `representation_args`: Representation-specific arguments (e.g., `{"lut_size": 16}` for LUT representations)
+- `representation_args`: Representation-specific arguments (e.g., `{"size": 16}` for LUT representations)
 - `steps`: Number of training iterations
 - `learning_rate`: Optimizer learning rate
 - `batch_size`: Training batch size

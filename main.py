@@ -191,7 +191,6 @@ def optimize(
     image_regularization = cfg.loss_weights.image_regularization
     black_preservation = cfg.loss_weights.black_preservation
     repr_smoothness = cfg.loss_weights.repr_smoothness
-    lut_size = cfg.representation_args.get("lut_size", 16)
 
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
@@ -237,9 +236,9 @@ def optimize(
 
     # Create representation (trainable!)
     if cfg.representation == "bw_lut":
-        representation = BWLUT(size=lut_size, initialize_identity=True).to(device)
+        representation = BWLUT(**cfg.representation_args).to(device)
     else:
-        representation = LUT(size=lut_size, initialize_identity=True).to(device)
+        representation = LUT(**cfg.representation_args).to(device)
 
     # Create optimizer for representation parameters
     optimizer = Adam(representation.parameters(), lr=learning_rate)
