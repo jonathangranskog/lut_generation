@@ -389,7 +389,7 @@ def main(
     bw_percentage: Annotated[
         float,
         typer.Option(help="Percentage of LUTs to generate as black & white (0.0-1.0)"),
-    ] = 0.2,
+    ] = 0.05,
     color_only: Annotated[
         bool,
         typer.Option(help="Only generate color LUTs (ignores bw_percentage)"),
@@ -426,7 +426,7 @@ def main(
     determined by the bw_percentage parameter and the prompt type.
 
     Examples:
-      # Generate 100 random LUTs (80% color, 20% B&W by default)
+      # Generate 100 random LUTs (95% color, 5% B&W by default)
       python scripts/generate_luts.py --image-folder images/ --sample 100 --output-dir luts/
 
       # Generate only color LUTs
