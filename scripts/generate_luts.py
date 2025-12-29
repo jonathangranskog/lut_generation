@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import typer
 from PIL import Image
@@ -21,7 +21,7 @@ from typing_extensions import Annotated
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.config import Config, load_config
-from utils.io import read_cube_file, load_image_as_tensor
+from utils.io import load_image_as_tensor, read_cube_file
 from utils.transforms import apply_lut
 
 app = typer.Typer()
@@ -38,7 +38,80 @@ def load_references(file_path: Path) -> List[str]:
     return lines
 
 
-def generate_prompts(
+def generate_color_prompts(
+    colors: List[str],
+    emotions: List[str],
+    film_formats: List[str],
+    cities: List[str],
+    weather: List[str],
+    movies: List[str],
+    directors: List[str],
+) -> List[Tuple[str, bool]]:
+    """
+    Generate color LUT prompts with sensible combinations.
+    Returns list of (prompt, is_grayscale) tuples.
+    """
+    prompts = []
+
+    # Film stock + emotion
+    for film, emotion in itertools.product(film_formats, emotions):
+        prompts.append((f"{film} {emotion}", False))
+
+    # Film stock + color
+    for film, color in itertools.product(film_formats, colors):
+        prompts.append((f"{film} {color}", False))
+
+    # Emotion + color
+    for emotion, color in itertools.product(emotions, colors):
+        prompts.append((f"{emotion} {color}", False))
+
+    # City + weather
+    for city, weather_term in itertools.product(cities, weather):
+        prompts.append((f"{city} {weather_term}", False))
+
+    # City + emotion
+    for city, emotion in itertools.product(cities, emotions):
+        prompts.append((f"{city} {emotion}", False))
+
+    # Weather + emotion
+    for weather_term, emotion in itertools.product(weather, emotions):
+        prompts.append((f"{weather_term} {emotion}", False))
+
+    # City + color
+    for city, color in itertools.product(cities, colors):
+        prompts.append((f"{city} {color}", False))
+
+    # Weather + color
+    for weather_term, color in itertools.product(weather, colors):
+        prompts.append((f"{weather_term} {color}", False))
+
+    return prompts
+
+
+def generate_bw_prompts(
+    film_formats_bw: List[str],
+    movies_bw: List[str],
+    directors_bw: List[str],
+) -> List[Tuple[str, bool]]:
+    """
+    Generate black & white LUT prompts.
+    Returns list of (prompt, is_grayscale) tuples.
+    """
+    prompts = []
+
+    for film in film_formats_bw:
+        prompts.append((film, True))
+
+    for movie in movies_bw:
+        prompts.append((movie, True))
+
+    for director in directors_bw:
+        prompts.append((director, True))
+
+    return prompts
+
+
+def generate_standalone_prompts(
     colors: List[str],
     emotions: List[str],
     film_formats: List[str],
@@ -49,56 +122,36 @@ def generate_prompts(
     movies_bw: List[str],
     directors: List[str],
     directors_bw: List[str],
-) -> List[str]:
+) -> List[Tuple[str, bool]]:
     """
-    Generate all possible LUT prompts with sensible combinations.
-    Returns list of prompt strings.
+    Generate standalone single-term prompts.
+    Returns list of (prompt, is_grayscale) tuples.
     """
     prompts = []
 
-    # Film stock + emotion
-    for film, emotion in itertools.product(film_formats, emotions):
-        prompts.append(f"{film} {emotion}")
+    # Color prompts
+    for color in colors:
+        prompts.append((color, False))
+    for emotion in emotions:
+        prompts.append((emotion, False))
+    for film in film_formats:
+        prompts.append((film, False))
+    for city in cities:
+        prompts.append((city, False))
+    for weather_term in weather:
+        prompts.append((weather_term, False))
+    for movie in movies:
+        prompts.append((movie, False))
+    for director in directors:
+        prompts.append((director, False))
 
-    # Film stock + color
-    for film, color in itertools.product(film_formats, colors):
-        prompts.append(f"{film} {color}")
-
-    # Emotion + color
-    for emotion, color in itertools.product(emotions, colors):
-        prompts.append(f"{emotion} {color}")
-
-    # City + weather
-    for city, weather_term in itertools.product(cities, weather):
-        prompts.append(f"{city} {weather_term}")
-
-    # City + emotion
-    for city, emotion in itertools.product(cities, emotions):
-        prompts.append(f"{city} {emotion}")
-
-    # Weather + emotion
-    for weather_term, emotion in itertools.product(weather, emotions):
-        prompts.append(f"{weather_term} {emotion}")
-
-    # City + color
-    for city, color in itertools.product(cities, colors):
-        prompts.append(f"{city} {color}")
-
-    # Weather + color
-    for weather_term, color in itertools.product(weather, colors):
-        prompts.append(f"{weather_term} {color}")
-
-    # Standalone prompts
-    prompts.extend(colors)
-    prompts.extend(emotions)
-    prompts.extend(film_formats)
-    prompts.extend(film_formats_bw)
-    prompts.extend(cities)
-    prompts.extend(weather)
-    prompts.extend(movies)
-    prompts.extend(movies_bw)
-    prompts.extend(directors)
-    prompts.extend(directors_bw)
+    # B&W prompts
+    for film in film_formats_bw:
+        prompts.append((film, True))
+    for movie in movies_bw:
+        prompts.append((movie, True))
+    for director in directors_bw:
+        prompts.append((director, True))
 
     return prompts
 
@@ -146,6 +199,7 @@ def sanitize_filename(prompt: str) -> str:
 def save_lut_metadata(
     output_path: Path,
     prompt: str,
+    is_grayscale: bool,
     config: Config,
     steps: int,
     learning_rate: float,
@@ -155,7 +209,7 @@ def save_lut_metadata(
         "utility": False,
         "prompt": prompt,
         "representation": config.representation,
-        "black_and_white": config.representation == "bw_lut",
+        "black_and_white": is_grayscale,
         "model": config.image_text_loss_type,
         "settings": {
             "steps": steps,
@@ -198,6 +252,7 @@ def apply_lut_to_test_image(
 
 def generate_lut(
     prompt: str,
+    is_grayscale: bool,
     image_folder: Path,
     output_dir: Path,
     base_config: Config,
@@ -208,14 +263,17 @@ def generate_lut(
 ) -> bool:
     """
     Generate a single LUT using main.py optimize command.
-    Uses the representation type from the config.
+    Creates a temporary config file with the appropriate representation type.
     Returns True if successful.
     """
     output_path = output_dir / f"{sanitize_filename(prompt)}.cube"
 
-    # Create a modified config for this LUT (with potentially overridden steps/lr)
+    # Determine representation type based on is_grayscale
+    representation = "bw_lut" if is_grayscale else "lut"
+
+    # Create a modified config for this LUT
     config = Config(
-        representation=base_config.representation,
+        representation=representation,
         image_text_loss_type=base_config.image_text_loss_type,
         loss_weights=base_config.loss_weights,
         representation_args=base_config.representation_args,
@@ -255,10 +313,9 @@ def generate_lut(
         Path(tmp_config_path).unlink(missing_ok=True)
         return True
 
-    is_grayscale = base_config.representation == "bw_lut"
     print(f"\n{'=' * 80}")
     print(f"Generating LUT: {prompt}")
-    print(f"Representation: {base_config.representation}")
+    print(f"Representation: {representation}")
     print(f"Steps: {steps}")
     print(f"Output: {output_path}")
     print(f"{'=' * 80}\n")
@@ -271,6 +328,7 @@ def generate_lut(
             save_lut_metadata(
                 output_path=output_path,
                 prompt=prompt,
+                is_grayscale=is_grayscale,
                 config=config,
                 steps=steps,
                 learning_rate=learning_rate,
@@ -297,7 +355,7 @@ def main(
     ],
     config: Annotated[
         str,
-        typer.Option(help="Path to JSON config file (determines representation type, model, etc.)"),
+        typer.Option(help="Path to JSON config file (determines model, loss weights, etc.)"),
     ] = "configs/color_clip.json",
     output_dir: Annotated[
         Path, typer.Option(help="Directory to save generated LUTs")
@@ -306,6 +364,22 @@ def main(
         Optional[int],
         typer.Option(help="Random sample size (generates this many LUTs total)"),
     ] = None,
+    bw_percentage: Annotated[
+        float,
+        typer.Option(help="Percentage of LUTs to generate as black & white (0.0-1.0)"),
+    ] = 0.2,
+    color_only: Annotated[
+        bool,
+        typer.Option(help="Only generate color LUTs (ignores bw_percentage)"),
+    ] = False,
+    bw_only: Annotated[
+        bool,
+        typer.Option(help="Only generate black & white LUTs (ignores bw_percentage)"),
+    ] = False,
+    standalone_only: Annotated[
+        bool,
+        typer.Option(help="Only generate standalone single-term prompts"),
+    ] = False,
     steps: Annotated[
         str, typer.Option(help="Training iterations per LUT (overrides config, supports ranges like 200-600)")
     ] = None,
@@ -325,15 +399,22 @@ def main(
     """
     Batch generate LUTs from reference files using a config file.
 
-    The config file determines the representation type (color LUT or B&W LUT),
-    the model to use (CLIP, SDS, Gemma), and other training parameters.
+    The config file determines the model to use (CLIP, SDS, Gemma), loss weights,
+    and other training parameters. The representation type (color vs B&W) is
+    determined by the bw_percentage parameter and the prompt type.
 
     Examples:
-      # Generate 100 random color LUTs using default color_clip config
+      # Generate 100 random LUTs (80% color, 20% B&W by default)
       python scripts/generate_luts.py --image-folder images/ --sample 100 --output-dir luts/
 
-      # Generate B&W LUTs using bw_clip config
-      python scripts/generate_luts.py --image-folder images/ --sample 50 --config configs/bw_clip.json
+      # Generate only color LUTs
+      python scripts/generate_luts.py --image-folder images/ --sample 50 --color-only
+
+      # Generate only B&W LUTs
+      python scripts/generate_luts.py --image-folder images/ --sample 50 --bw-only
+
+      # Generate with 50% B&W LUTs
+      python scripts/generate_luts.py --image-folder images/ --sample 100 --bw-percentage 0.5
 
       # Generate using SDS config
       python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/color_sds.json
@@ -350,7 +431,6 @@ def main(
     # Load base config
     base_config = load_config(config)
     print(f"Loaded config from: {config}")
-    print(f"  Representation: {base_config.representation}")
     print(f"  Model type: {base_config.image_text_loss_type}")
     print(f"  Batch size: {base_config.batch_size}")
     print(f"  Default steps: {base_config.steps}")
@@ -404,27 +484,86 @@ def main(
     print(f"  Directors: {len(directors)}")
     print(f"  Directors (B&W): {len(directors_bw)}")
 
-    # Generate all prompts
-    all_prompts = generate_prompts(
-        colors=colors,
-        emotions=emotions,
-        film_formats=film_formats,
-        film_formats_bw=film_formats_bw,
-        cities=cities,
-        weather=weather,
-        movies=movies,
-        movies_bw=movies_bw,
-        directors=directors,
-        directors_bw=directors_bw,
-    )
+    # Generate prompts based on flags
+    if standalone_only:
+        all_prompts = generate_standalone_prompts(
+            colors=colors,
+            emotions=emotions,
+            film_formats=film_formats,
+            film_formats_bw=film_formats_bw,
+            cities=cities,
+            weather=weather,
+            movies=movies,
+            movies_bw=movies_bw,
+            directors=directors,
+            directors_bw=directors_bw,
+        )
+    else:
+        # Generate both color and B&W prompts
+        color_prompts = generate_color_prompts(
+            colors=colors,
+            emotions=emotions,
+            film_formats=film_formats,
+            cities=cities,
+            weather=weather,
+            movies=movies,
+            directors=directors,
+        )
+        bw_prompts = generate_bw_prompts(
+            film_formats_bw=film_formats_bw,
+            movies_bw=movies_bw,
+            directors_bw=directors_bw,
+        )
+        standalone = generate_standalone_prompts(
+            colors=colors,
+            emotions=emotions,
+            film_formats=film_formats,
+            film_formats_bw=film_formats_bw,
+            cities=cities,
+            weather=weather,
+            movies=movies,
+            movies_bw=movies_bw,
+            directors=directors,
+            directors_bw=directors_bw,
+        )
+        all_prompts = color_prompts + bw_prompts + standalone
+
     print(f"\nGenerated {len(all_prompts)} total prompts")
+
+    # Filter by color/bw preference
+    if color_only:
+        all_prompts = [(p, g) for p, g in all_prompts if not g]
+        print(f"Filtered to {len(all_prompts)} color prompts")
+    elif bw_only:
+        all_prompts = [(p, g) for p, g in all_prompts if g]
+        print(f"Filtered to {len(all_prompts)} B&W prompts")
 
     # Sample if requested
     if sample and sample < len(all_prompts):
-        all_prompts = random.sample(all_prompts, sample)
-        print(f"Sampled {len(all_prompts)} prompts")
+        # If not color_only or bw_only, sample with bw_percentage
+        if not color_only and not bw_only:
+            color_prompts = [(p, g) for p, g in all_prompts if not g]
+            bw_prompts = [(p, g) for p, g in all_prompts if g]
 
-    print(f"\nTotal prompts to generate: {len(all_prompts)}\n")
+            num_bw = int(sample * bw_percentage)
+            num_color = sample - num_bw
+
+            # Sample from each pool (or take all if not enough)
+            sampled_bw = random.sample(bw_prompts, min(num_bw, len(bw_prompts)))
+            sampled_color = random.sample(color_prompts, min(num_color, len(color_prompts)))
+
+            all_prompts = sampled_color + sampled_bw
+            random.shuffle(all_prompts)
+            print(f"Sampled {len(sampled_color)} color + {len(sampled_bw)} B&W = {len(all_prompts)} prompts")
+        else:
+            all_prompts = random.sample(all_prompts, sample)
+            print(f"Sampled {len(all_prompts)} prompts")
+
+    print(f"\nTotal prompts to generate: {len(all_prompts)}")
+    color_count = sum(1 for _, g in all_prompts if not g)
+    bw_count = sum(1 for _, g in all_prompts if g)
+    print(f"  Color: {color_count}")
+    print(f"  B&W: {bw_count}\n")
 
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -433,7 +572,7 @@ def main(
     successful = 0
     failed = 0
 
-    for i, prompt in enumerate(all_prompts, 1):
+    for i, (prompt, is_grayscale) in enumerate(all_prompts, 1):
         print(f"\n[{i}/{len(all_prompts)}]")
 
         # Randomize steps for each LUT within the specified range
@@ -444,6 +583,7 @@ def main(
 
         success = generate_lut(
             prompt=prompt,
+            is_grayscale=is_grayscale,
             image_folder=image_folder,
             output_dir=output_dir,
             base_config=base_config,
