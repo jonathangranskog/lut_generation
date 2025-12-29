@@ -47,7 +47,7 @@ class TestOptimizeWorkflow:
 
         # Verify LUT can be loaded
         lut_tensor, domain_min, domain_max = read_cube_file(str(output_lut))
-        assert lut_tensor.shape == (8, 8, 8, 3)
+        assert lut_tensor.shape == (16, 16, 16, 3)
         assert lut_tensor.min() >= 0.0
         assert lut_tensor.max() <= 1.0
 
