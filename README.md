@@ -83,7 +83,7 @@ python scripts/generate_luts.py --sample 100 --test-image images/IMG_0001.png --
 This command generates 100 LUTs automatically using the default color_clip config. You can also specify a different config:
 
 ```bash
-python scripts/generate_luts.py --sample 10 --config configs/color_sds.json --image-folder images --output-dir tmp/generated_luts/
+python scripts/generate_luts.py --sample 100 --config configs/color_sds.json --image-folder images --output-dir tmp/generated_luts/
 ```
 
 ## Commands

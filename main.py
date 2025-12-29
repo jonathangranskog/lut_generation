@@ -192,7 +192,6 @@ def optimize(
     black_preservation = cfg.loss_weights.black_preservation
     repr_smoothness = cfg.loss_weights.repr_smoothness
     lut_size = cfg.representation_args.get("lut_size", 16)
-    grayscale = cfg.representation == "bw_lut"
 
     # Select device (MPS doesn't support grid_sampler_3d_backward)
     device = get_device(allow_mps=False)
@@ -237,7 +236,7 @@ def optimize(
         raise ValueError(f"Unknown model type: {model_type}")
 
     # Create representation (trainable!)
-    if grayscale:
+    if cfg.representation == "bw_lut":
         representation = BWLUT(size=lut_size, initialize_identity=True).to(device)
     else:
         representation = LUT(size=lut_size, initialize_identity=True).to(device)
