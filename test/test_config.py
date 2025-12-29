@@ -108,16 +108,18 @@ class TestConfig:
         }
         config = Config.from_dict(data)
 
-        assert config.representation == "bw_lut"
-        assert config.image_text_loss_type == "gemma3_12b"
-        assert config.steps == 250
-        assert config.learning_rate == 0.002
-        assert config.batch_size == 2
-        assert config.loss_weights.image_text == 5.0
-        assert config.loss_weights.image_smoothness == 0.5
+        # Check all fields from data dict
+        for key in data.keys():
+            if key == "loss_weights":
+                for lw_key, lw_value in data["loss_weights"].items():
+                    assert getattr(config.loss_weights, lw_key) == lw_value
+            elif key == "representation_args":
+                assert config.representation_args == data["representation_args"]
+            else:
+                assert getattr(config, key) == data[key]
+
         # Defaults should be preserved for unspecified values
         assert config.loss_weights.image_regularization == 1.0
-        assert config.representation_args.get("size") == 32
 
     def test_from_dict_with_defaults(self):
         """Test creating config from empty dictionary uses defaults."""
@@ -171,17 +173,7 @@ class TestConfig:
         data = original.to_dict()
         restored = Config.from_dict(data)
 
-        assert restored.representation == original.representation
-        assert restored.image_text_loss_type == original.image_text_loss_type
-        assert restored.steps == original.steps
-        assert restored.learning_rate == original.learning_rate
-        assert restored.batch_size == original.batch_size
-        assert restored.loss_weights.image_text == original.loss_weights.image_text
-        assert restored.loss_weights.image_smoothness == original.loss_weights.image_smoothness
-        assert (
-            restored.representation_args.get("size")
-            == original.representation_args.get("size")
-        )
+        assert restored.to_dict() == original.to_dict()
 
 
 class TestConfigIO:
@@ -210,16 +202,9 @@ class TestConfigIO:
             data = json.load(f)
         assert "representation" in data
 
-        # Load from file
+        # Load from file and verify roundtrip
         loaded = Config.from_json(config_path)
-
-        assert loaded.representation == original.representation
-        assert loaded.image_text_loss_type == original.image_text_loss_type
-        assert loaded.steps == original.steps
-        assert loaded.learning_rate == original.learning_rate
-        assert loaded.batch_size == original.batch_size
-        assert loaded.loss_weights.image_text == original.loss_weights.image_text
-        assert loaded.representation_args.get("size") == original.representation_args.get("size")
+        assert loaded.to_dict() == original.to_dict()
 
     def test_load_config_function(self, temp_dir):
         """Test the load_config convenience function."""
