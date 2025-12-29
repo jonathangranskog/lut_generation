@@ -160,7 +160,6 @@ python scripts/generate_luts.py \
   - Single value: `--steps 500` (all LUTs use 500 steps)
   - Range: `--steps 200-600` (each LUT uses random steps in range)
   - Default: `200-600` (randomized for variety)
-- `--lut-size N` - LUT resolution (default: 16)
 - `--batch-size N` - Batch size. Auto-adjusts by model:
   - CLIP: 4 (default)
   - VLMs (Gemma) & SDS: 1 (memory-intensive models)
@@ -347,11 +346,6 @@ python scripts/generate_utility_luts.py \
 python scripts/generate_utility_luts.py --saturation-only --output-dir luts/
 ```
 
-#### Generate with high resolution
-```bash
-python scripts/generate_utility_luts.py --lut-size 64 --output-dir luts/utility/
-```
-
 #### Preview without generating
 ```bash
 python scripts/generate_utility_luts.py --dry-run
@@ -361,7 +355,6 @@ python scripts/generate_utility_luts.py --dry-run
 
 ```
 --output-dir PATH        Output directory (default: luts/utility/)
---lut-size N            LUT resolution (default: 32)
 --test-image PATH       Test image to apply each LUT to (saves .png alongside .cube)
 
 # Category filters (generate only specific types)

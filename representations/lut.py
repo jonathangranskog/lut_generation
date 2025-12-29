@@ -202,7 +202,9 @@ class LUT(BaseRepresentation):
         # Verify we have the right amount of data
         expected_entries = lut_size**3
         if len(lut_data) != expected_entries:
-            raise ValueError(f"Expected {expected_entries} entries, got {len(lut_data)}")
+            raise ValueError(
+                f"Expected {expected_entries} entries, got {len(lut_data)}"
+            )
 
         # Convert to numpy array and reshape with Fortran order
         lut_array = np.array(lut_data, dtype=np.float32)
