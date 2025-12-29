@@ -63,7 +63,9 @@ class TestOptimizeWorkflow:
     """Integration tests for the optimize command."""
 
     @pytest.mark.slow
-    def test_optimize_clip_basic(self, sample_image_folder, temp_dir, test_config_color_clip):
+    def test_optimize_clip_basic(
+        self, sample_image_folder, temp_dir, test_config_color_clip
+    ):
         """Test basic CLIP optimization workflow with minimal steps."""
         output_lut = temp_dir / "test_clip.cube"
 
@@ -123,7 +125,9 @@ class TestOptimizeWorkflow:
         assert result.returncode != 0
         assert "No valid images found" in result.stderr
 
-    def test_optimize_with_custom_log_dir(self, sample_image_folder, temp_dir, test_config_color_clip):
+    def test_optimize_with_custom_log_dir(
+        self, sample_image_folder, temp_dir, test_config_color_clip
+    ):
         """Test optimize with custom log directory."""
         output_lut = temp_dir / "test.cube"
         log_dir = temp_dir / "custom_logs"
@@ -166,7 +170,9 @@ class TestOptimizeWorkflow:
         log_files = list(log_dir.glob("*.cube")) + list(log_dir.glob("*.png"))
         assert len(log_files) > 0, "No log files created"
 
-    def test_optimize_grayscale(self, sample_image_folder, temp_dir, test_config_bw_clip):
+    def test_optimize_grayscale(
+        self, sample_image_folder, temp_dir, test_config_bw_clip
+    ):
         """Test grayscale LUT optimization using bw_lut config."""
         output_lut = temp_dir / "grayscale.cube"
 
@@ -280,7 +286,9 @@ class TestEndToEndPipeline:
     """End-to-end pipeline tests combining optimize and infer."""
 
     @pytest.mark.slow
-    def test_optimize_then_infer(self, sample_image_folder, temp_dir, test_config_color_clip):
+    def test_optimize_then_infer(
+        self, sample_image_folder, temp_dir, test_config_color_clip
+    ):
         """Test complete pipeline: optimize a LUT, then use it for inference."""
         lut_file = temp_dir / "pipeline.cube"
         output_image = temp_dir / "result.png"

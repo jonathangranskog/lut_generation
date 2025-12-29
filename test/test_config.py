@@ -51,7 +51,13 @@ class TestRepresentationArgs:
 
     def test_arbitrary_params(self):
         """Test that representation_args can hold arbitrary parameters."""
-        config = Config(representation_args={"size": 16, "custom_param": "value", "nested": {"a": 1}})
+        config = Config(
+            representation_args={
+                "size": 16,
+                "custom_param": "value",
+                "nested": {"a": 1},
+            }
+        )
         assert config.representation_args.get("size") == 16
         assert config.representation_args.get("custom_param") == "value"
         assert config.representation_args.get("nested") == {"a": 1}

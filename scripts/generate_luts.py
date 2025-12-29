@@ -380,11 +380,15 @@ def main(
     ] = False,
     steps: Annotated[
         Optional[str],
-        typer.Option(help="Training steps (overrides config, supports ranges like 200-600)"),
+        typer.Option(
+            help="Training steps (overrides config, supports ranges like 200-600)"
+        ),
     ] = None,
     learning_rate: Annotated[
         Optional[str],
-        typer.Option(help="Learning rate (overrides config, supports ranges like 0.001-0.01)"),
+        typer.Option(
+            help="Learning rate (overrides config, supports ranges like 0.001-0.01)"
+        ),
     ] = None,
     test_image: Annotated[
         Optional[Path], typer.Option(help="Test image to apply each LUT to")
@@ -494,7 +498,9 @@ def main(
     # Sample if requested, respecting B&W percentage
     if sample and sample < len(all_prompts):
         if not 0.0 <= bw_percentage <= 1.0:
-            print(f"ERROR: bw_percentage must be between 0.0 and 1.0, got {bw_percentage}")
+            print(
+                f"ERROR: bw_percentage must be between 0.0 and 1.0, got {bw_percentage}"
+            )
             raise typer.Exit(1)
 
         color_prompts = [p for p in all_prompts if not p[1]]
@@ -504,12 +510,16 @@ def main(
         num_color = sample - num_bw
 
         if num_bw > len(bw_prompts):
-            print(f"WARNING: Requested {num_bw} B&W LUTs but only {len(bw_prompts)} available")
+            print(
+                f"WARNING: Requested {num_bw} B&W LUTs but only {len(bw_prompts)} available"
+            )
             num_bw = len(bw_prompts)
             num_color = sample - num_bw
 
         if num_color > len(color_prompts):
-            print(f"WARNING: Requested {num_color} color LUTs but only {len(color_prompts)} available")
+            print(
+                f"WARNING: Requested {num_color} color LUTs but only {len(color_prompts)} available"
+            )
             num_color = len(color_prompts)
             num_bw = sample - num_color
 
