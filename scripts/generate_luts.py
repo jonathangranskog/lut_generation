@@ -121,13 +121,13 @@ def generate_bw_prompts(
     prompts = []
 
     for film in film_formats_bw:
-        prompts.append((film, True))
+        prompts.append((f"{film} black and white", True))
 
     for movie in movies_bw:
-        prompts.append((movie, True))
+        prompts.append((f"{movie} black and white", True))
 
     for director in directors_bw:
-        prompts.append((director, True))
+        prompts.append((f"{director} black and white", True))
 
     return prompts
 
@@ -168,11 +168,11 @@ def generate_standalone_prompts(
 
     # B&W prompts
     for film in film_formats_bw:
-        prompts.append((film, True))
+        prompts.append((f"{film} black and white", True))
     for movie in movies_bw:
-        prompts.append((movie, True))
+        prompts.append((f"{movie} black and white", True))
     for director in directors_bw:
-        prompts.append((director, True))
+        prompts.append((f"{director} black and white", True))
 
     return prompts
 
