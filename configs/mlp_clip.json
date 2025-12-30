@@ -1,0 +1,19 @@
+{
+  "representation": "mlp",
+  "image_text_loss_type": "clip",
+  "loss_weights": {
+    "image_text": 1.0,
+    "image_smoothness": 1.0,
+    "image_regularization": 1.0,
+    "black_preservation": 1.0,
+    "repr_smoothness": 0.001
+  },
+  "representation_args": {
+    "num_layers": 2,
+    "hidden_width": 128,
+    "init_scale": 0.01
+  },
+  "steps": 500,
+  "learning_rate": 0.005,
+  "batch_size": 4
+}

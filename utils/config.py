@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Dict, Literal
 
-RepresentationType = Literal["lut", "bw_lut"]
+RepresentationType = Literal["lut", "bw_lut", "mlp"]
 ImageTextLossType = Literal["clip", "gemma3_4b", "gemma3_12b", "gemma3_27b", "sds"]
 
 
