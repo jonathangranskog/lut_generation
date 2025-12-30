@@ -59,8 +59,7 @@ def convert(
 
     print(f"Evaluating MLP on {flat_rgb.shape[0]} color samples...")
     with torch.no_grad():
-        # Process through MLP
-        transformed_rgb = mlp.network(flat_rgb) + flat_rgb  # ResNet-style
+        transformed_rgb = mlp._apply_mlp(flat_rgb)
 
     # Reshape back to (size, size, size, 3)
     transformed_lut = transformed_rgb.reshape(lut_size, lut_size, lut_size, 3)

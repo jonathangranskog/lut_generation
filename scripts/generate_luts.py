@@ -290,7 +290,7 @@ def convert_mlp_to_lut(mlp_path: Path, lut_path: Path, lut_size: int = 32) -> No
         # Flatten and process through MLP
         flat_rgb = identity_tensor.reshape(-1, 3)
         with torch.no_grad():
-            transformed_rgb = mlp.network(flat_rgb) + flat_rgb
+            transformed_rgb = mlp._apply_mlp(flat_rgb)
 
         # Reshape and clamp
         transformed_lut = transformed_rgb.reshape(lut_size, lut_size, lut_size, 3)
