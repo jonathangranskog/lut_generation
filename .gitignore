@@ -6,6 +6,8 @@
 *.heif
 *.tiff
 *.gif
+*.pt
+*.pth
 *.bmp
 *.cube
 __pycache__/

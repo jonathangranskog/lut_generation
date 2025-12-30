@@ -6,7 +6,7 @@
     "image_smoothness": 1.0,
     "image_regularization": 1.0,
     "black_preservation": 1.0,
-    "repr_smoothness": 0.001
+    "repr_smoothness": 0.0001
   },
   "representation_args": {
     "num_layers": 2,
@@ -14,6 +14,6 @@
     "init_scale": 0.01
   },
   "steps": 500,
-  "learning_rate": 0.005,
+  "learning_rate": 0.001,
   "batch_size": 4
 }
