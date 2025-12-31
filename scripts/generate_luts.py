@@ -22,7 +22,7 @@ from typing_extensions import Annotated
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from representations import MLP, LUT
+from representations import MLP
 from utils.config import Config, load_config
 from utils.io import load_image_as_tensor, read_cube_file
 from utils.transforms import apply_lut
@@ -275,35 +275,6 @@ def apply_mlp_to_test_image(
         print(f"  WARNING: Failed to apply MLP to test image: {e}")
 
 
-def convert_mlp_to_lut(mlp_path: Path, lut_path: Path, lut_size: int = 32) -> None:
-    """Convert an MLP checkpoint to a LUT file."""
-    import torch
-
-    try:
-        mlp = MLP.read(str(mlp_path))
-        mlp.eval()
-
-        # Create identity LUT
-        lut = LUT(size=lut_size, initialize_identity=True)
-        identity_tensor = lut.lut_tensor.data.clone()
-
-        # Flatten and process through MLP
-        flat_rgb = identity_tensor.reshape(-1, 3)
-        with torch.no_grad():
-            transformed_rgb = mlp._apply_mlp(flat_rgb)
-
-        # Reshape and clamp
-        transformed_lut = transformed_rgb.reshape(lut_size, lut_size, lut_size, 3)
-        transformed_lut = transformed_lut.clamp(0, 1)
-
-        # Save
-        lut.lut_tensor.data = transformed_lut
-        lut.write(str(lut_path), title=f"MLP converted to LUT (size={lut_size})")
-        print(f"  Converted MLP to LUT: {lut_path}")
-    except Exception as e:
-        print(f"  WARNING: Failed to convert MLP to LUT: {e}")
-
-
 def generate_lut(
     prompt: str,
     is_grayscale: bool,
@@ -314,8 +285,6 @@ def generate_lut(
     learning_rate: float,
     test_image: Optional[Path] = None,
     dry_run: bool = False,
-    convert_to_lut: bool = False,
-    convert_lut_size: int = 32,
 ) -> bool:
     """
     Generate a single LUT or MLP using main.py optimize command.
@@ -372,9 +341,6 @@ def generate_lut(
 
     if dry_run:
         print(f"[DRY RUN] Would run: {' '.join(cmd)}")
-        if is_mlp and convert_to_lut:
-            lut_output_path = output_path.with_suffix(".cube")
-            print(f"[DRY RUN] Would convert MLP to LUT: {lut_output_path}")
         tmp_config_path.unlink(missing_ok=True)
         _temp_files.discard(tmp_config_path)
         return True
@@ -402,11 +368,6 @@ def generate_lut(
                 apply_mlp_to_test_image(output_path, test_image, test_output_path)
             else:
                 apply_lut_to_test_image(output_path, test_image, test_output_path)
-
-        # Convert MLP to LUT if requested
-        if is_mlp and convert_to_lut:
-            lut_output_path = output_path.with_suffix(".cube")
-            convert_mlp_to_lut(output_path, lut_output_path, convert_lut_size)
 
         return True
     except subprocess.CalledProcessError as e:
@@ -470,18 +431,6 @@ def main(
     dry_run: Annotated[
         bool, typer.Option(help="Print commands without executing")
     ] = False,
-    convert_to_lut: Annotated[
-        bool,
-        typer.Option(
-            help="Convert MLP outputs to LUT format (only applies when using MLP config)"
-        ),
-    ] = False,
-    convert_lut_size: Annotated[
-        int,
-        typer.Option(
-            help="LUT size for MLP conversion (only applies with --convert-to-lut)"
-        ),
-    ] = 32,
 ):
     """
     Batch generate LUTs from reference files using a config file.
@@ -499,11 +448,8 @@ def main(
       # Use a different config
       python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/color_sds.json
 
-      # Generate using MLP config and convert to LUT format
-      python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/mlp_clip.json --convert-to-lut
-
-      # Generate MLP with custom LUT conversion size
-      python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/mlp_clip.json --convert-to-lut --convert-lut-size 64
+      # Generate using MLP config
+      python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/mlp_clip.json
     """
     if seed:
         random.seed(seed)
@@ -516,8 +462,6 @@ def main(
     print(f"  Batch size: {base_config.batch_size}")
     if base_config.representation == "mlp":
         print(f"  MLP args: {base_config.representation_args}")
-        if convert_to_lut:
-            print(f"  Will convert to LUT (size={convert_lut_size})")
 
     # Parse steps range (use config default if not specified)
     if steps is None:
@@ -652,8 +596,6 @@ def main(
             learning_rate=learning_rate_value,
             test_image=test_image,
             dry_run=dry_run,
-            convert_to_lut=convert_to_lut,
-            convert_lut_size=convert_lut_size,
         )
 
         if success:
