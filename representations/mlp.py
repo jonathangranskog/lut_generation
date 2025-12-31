@@ -12,12 +12,15 @@ ColorSpace = Literal["rgb", "lab", "luv", "ycbcr"]
 
 class MLP(BaseRepresentation):
     """
-    MLP that learns RGB color transformations with ResNet-style residual.
-    Output = input + network(input).
+    MLP that learns RGB color transformations.
+
+    Supports two modes:
+    - Offset only (default): output = input + offset(input)
+    - Scale + offset: output = input * scale(input) + offset(input)
 
     Supports operating in different color spaces. Input RGB is converted to
-    the target color space, the network learns residuals there, then converts
-    back to RGB.
+    the target color space, the network learns transformations there, then
+    converts back to RGB.
 
     Supported color spaces:
     - rgb: Standard RGB (no conversion)
@@ -32,12 +35,17 @@ class MLP(BaseRepresentation):
         hidden_width: int = 128,
         init_scale: float = 0.01,
         color_space: ColorSpace = "rgb",
+        use_scale: bool = False,
     ):
         super().__init__()
         self.num_layers = num_layers
         self.hidden_width = hidden_width
         self.init_scale = init_scale
         self.color_space = color_space
+        self.use_scale = use_scale
+
+        # Output size: 3 for offset only, 6 for scale + offset
+        output_size = 6 if use_scale else 3
 
         # Build network
         layers = []
@@ -48,7 +56,7 @@ class MLP(BaseRepresentation):
             layers.append(nn.Linear(hidden_width, hidden_width))
             layers.append(nn.ReLU())
 
-        layers.append(nn.Linear(hidden_width, 3))
+        layers.append(nn.Linear(hidden_width, output_size))
         self.network = nn.Sequential(*layers)
 
         self._init_weights()
@@ -110,27 +118,37 @@ class MLP(BaseRepresentation):
         rgb_image = kornia.color.ycbcr_to_rgb(ycbcr_image)
         return rgb_image.squeeze(-1).squeeze(-1)  # (N, 3)
 
+    def _apply_transform(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply the learned transformation (scale + offset or offset only)."""
+        output = self.network(x)
+
+        if self.use_scale:
+            # output[:, :3] is scale, output[:, 3:] is offset
+            # Transform: x * scale + offset (scale centered around 1)
+            scale = output[:, :3]
+            offset = output[:, 3:]
+            return x * (1.0 + scale) + offset
+        else:
+            # output is just offset (residual)
+            return x + output
+
     def _apply_mlp(self, x_flat: torch.Tensor) -> torch.Tensor:
-        """Apply network + residual addition in the configured color space."""
+        """Apply network transformation in the configured color space."""
         if self.color_space == "lab":
             converted = self._rgb_to_lab(x_flat)
-            residual = self.network(converted)
-            converted_out = converted + residual
+            converted_out = self._apply_transform(converted)
             return self._lab_to_rgb(converted_out)
         elif self.color_space == "luv":
             converted = self._rgb_to_luv(x_flat)
-            residual = self.network(converted)
-            converted_out = converted + residual
+            converted_out = self._apply_transform(converted)
             return self._luv_to_rgb(converted_out)
         elif self.color_space == "ycbcr":
             converted = self._rgb_to_ycbcr(x_flat)
-            residual = self.network(converted)
-            converted_out = converted + residual
+            converted_out = self._apply_transform(converted)
             return self._ycbcr_to_rgb(converted_out)
         else:
-            # Standard RGB residual
-            residual = self.network(x_flat)
-            return x_flat + residual
+            # Standard RGB
+            return self._apply_transform(x_flat)
 
     def forward(self, images: torch.Tensor, training: bool = False) -> torch.Tensor:
         is_batched = images.ndim == 4
@@ -176,6 +194,7 @@ class MLP(BaseRepresentation):
             hidden_width=checkpoint["hidden_width"],
             init_scale=checkpoint.get("init_scale", 0.01),
             color_space=checkpoint.get("color_space", "rgb"),
+            use_scale=checkpoint.get("use_scale", False),
         )
         mlp.load_state_dict(checkpoint["state_dict"])
         return mlp
@@ -190,6 +209,7 @@ class MLP(BaseRepresentation):
             "hidden_width": self.hidden_width,
             "init_scale": self.init_scale,
             "color_space": self.color_space,
+            "use_scale": self.use_scale,
             "state_dict": self.state_dict(),
         }
         torch.save(checkpoint, file_path)
