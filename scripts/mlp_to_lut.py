@@ -24,7 +24,9 @@ app = typer.Typer()
 @app.command()
 def convert(
     mlp_path: Annotated[str, typer.Argument(help="Path to MLP checkpoint (.pt file)")],
-    output_path: Annotated[str, typer.Argument(help="Output path for LUT (.cube file)")],
+    output_path: Annotated[
+        str, typer.Argument(help="Output path for LUT (.cube file)")
+    ],
     lut_size: Annotated[int, typer.Option(help="LUT resolution")] = 32,
 ) -> None:
     """

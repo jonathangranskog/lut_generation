@@ -472,11 +472,15 @@ def main(
     ] = False,
     convert_to_lut: Annotated[
         bool,
-        typer.Option(help="Convert MLP outputs to LUT format (only applies when using MLP config)"),
+        typer.Option(
+            help="Convert MLP outputs to LUT format (only applies when using MLP config)"
+        ),
     ] = False,
     convert_lut_size: Annotated[
         int,
-        typer.Option(help="LUT size for MLP conversion (only applies with --convert-to-lut)"),
+        typer.Option(
+            help="LUT size for MLP conversion (only applies with --convert-to-lut)"
+        ),
     ] = 32,
 ):
     """
