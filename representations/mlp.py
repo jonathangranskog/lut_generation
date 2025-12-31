@@ -7,15 +7,23 @@ import torch
 import torch.nn as nn
 from .base import BaseRepresentation
 
+ColorSpace = Literal["rgb", "lab", "luv", "ycbcr"]
+
 
 class MLP(BaseRepresentation):
     """
     MLP that learns RGB color transformations with ResNet-style residual.
     Output = input + network(input).
 
-    Supports operating in RGB or LAB color space. When using LAB, input RGB
-    is converted to LAB, the network learns residuals in LAB space, then
-    converts back to RGB.
+    Supports operating in different color spaces. Input RGB is converted to
+    the target color space, the network learns residuals there, then converts
+    back to RGB.
+
+    Supported color spaces:
+    - rgb: Standard RGB (no conversion)
+    - lab: CIE LAB (perceptually uniform)
+    - luv: CIE Luv (perceptually uniform, different from LAB)
+    - ycbcr: YCbCr (luminance + chrominance, common in video)
     """
 
     def __init__(
@@ -23,7 +31,7 @@ class MLP(BaseRepresentation):
         num_layers: int = 2,
         hidden_width: int = 128,
         init_scale: float = 0.01,
-        color_space: Literal["rgb", "lab"] = "rgb",
+        color_space: ColorSpace = "rgb",
     ):
         super().__init__()
         self.num_layers = num_layers
@@ -78,14 +86,47 @@ class MLP(BaseRepresentation):
         rgb_image = kornia.color.lab_to_rgb(lab_image)
         return rgb_image.squeeze(-1).squeeze(-1)  # (N, 3)
 
+    def _rgb_to_luv(self, rgb_flat: torch.Tensor) -> torch.Tensor:
+        """Convert flat RGB (N, 3) to Luv using kornia."""
+        rgb_image = rgb_flat.unsqueeze(-1).unsqueeze(-1)  # (N, 3, 1, 1)
+        luv_image = kornia.color.rgb_to_luv(rgb_image)
+        return luv_image.squeeze(-1).squeeze(-1)  # (N, 3)
+
+    def _luv_to_rgb(self, luv_flat: torch.Tensor) -> torch.Tensor:
+        """Convert flat Luv (N, 3) to RGB using kornia."""
+        luv_image = luv_flat.unsqueeze(-1).unsqueeze(-1)  # (N, 3, 1, 1)
+        rgb_image = kornia.color.luv_to_rgb(luv_image)
+        return rgb_image.squeeze(-1).squeeze(-1)  # (N, 3)
+
+    def _rgb_to_ycbcr(self, rgb_flat: torch.Tensor) -> torch.Tensor:
+        """Convert flat RGB (N, 3) to YCbCr using kornia."""
+        rgb_image = rgb_flat.unsqueeze(-1).unsqueeze(-1)  # (N, 3, 1, 1)
+        ycbcr_image = kornia.color.rgb_to_ycbcr(rgb_image)
+        return ycbcr_image.squeeze(-1).squeeze(-1)  # (N, 3)
+
+    def _ycbcr_to_rgb(self, ycbcr_flat: torch.Tensor) -> torch.Tensor:
+        """Convert flat YCbCr (N, 3) to RGB using kornia."""
+        ycbcr_image = ycbcr_flat.unsqueeze(-1).unsqueeze(-1)  # (N, 3, 1, 1)
+        rgb_image = kornia.color.ycbcr_to_rgb(ycbcr_image)
+        return rgb_image.squeeze(-1).squeeze(-1)  # (N, 3)
+
     def _apply_mlp(self, x_flat: torch.Tensor) -> torch.Tensor:
-        """Apply network + residual addition, optionally in LAB space."""
+        """Apply network + residual addition in the configured color space."""
         if self.color_space == "lab":
-            # Convert RGB to LAB, apply residual in LAB space, convert back
-            lab = self._rgb_to_lab(x_flat)
-            residual = self.network(lab)
-            lab_out = lab + residual
-            return self._lab_to_rgb(lab_out)
+            converted = self._rgb_to_lab(x_flat)
+            residual = self.network(converted)
+            converted_out = converted + residual
+            return self._lab_to_rgb(converted_out)
+        elif self.color_space == "luv":
+            converted = self._rgb_to_luv(x_flat)
+            residual = self.network(converted)
+            converted_out = converted + residual
+            return self._luv_to_rgb(converted_out)
+        elif self.color_space == "ycbcr":
+            converted = self._rgb_to_ycbcr(x_flat)
+            residual = self.network(converted)
+            converted_out = converted + residual
+            return self._ycbcr_to_rgb(converted_out)
         else:
             # Standard RGB residual
             residual = self.network(x_flat)
