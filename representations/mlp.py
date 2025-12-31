@@ -36,6 +36,7 @@ class MLP(BaseRepresentation):
         init_scale: float = 0.01,
         color_space: ColorSpace = "rgb",
         use_scale: bool = False,
+        disable_bias: bool = False,
     ):
         super().__init__()
         self.num_layers = num_layers
@@ -43,20 +44,22 @@ class MLP(BaseRepresentation):
         self.init_scale = init_scale
         self.color_space = color_space
         self.use_scale = use_scale
+        self.disable_bias = disable_bias
 
         # Output size: 3 for offset only, 6 for scale + offset
         output_size = 6 if use_scale else 3
+        use_bias = not disable_bias
 
         # Build network
         layers = []
-        layers.append(nn.Linear(3, hidden_width))
+        layers.append(nn.Linear(3, hidden_width, bias=use_bias))
         layers.append(nn.ReLU())
 
         for _ in range(num_layers - 1):
-            layers.append(nn.Linear(hidden_width, hidden_width))
+            layers.append(nn.Linear(hidden_width, hidden_width, bias=use_bias))
             layers.append(nn.ReLU())
 
-        layers.append(nn.Linear(hidden_width, output_size))
+        layers.append(nn.Linear(hidden_width, output_size, bias=use_bias))
         self.network = nn.Sequential(*layers)
 
         self._init_weights()
@@ -65,13 +68,15 @@ class MLP(BaseRepresentation):
         for module in self.network.modules():
             if isinstance(module, nn.Linear):
                 nn.init.normal_(module.weight, mean=0.0, std=self.init_scale)
-                nn.init.zeros_(module.bias)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
         # Final layer even smaller for near-identity start
         final_layer = self.network[-1]
         if isinstance(final_layer, nn.Linear):
             nn.init.normal_(final_layer.weight, mean=0.0, std=self.init_scale * 0.1)
-            nn.init.zeros_(final_layer.bias)
+            if final_layer.bias is not None:
+                nn.init.zeros_(final_layer.bias)
 
     def smoothness_loss(self) -> torch.Tensor:
         """L2 weight regularization."""
@@ -195,6 +200,7 @@ class MLP(BaseRepresentation):
             init_scale=checkpoint.get("init_scale", 0.01),
             color_space=checkpoint.get("color_space", "rgb"),
             use_scale=checkpoint.get("use_scale", False),
+            disable_bias=checkpoint.get("disable_bias", False),
         )
         mlp.load_state_dict(checkpoint["state_dict"])
         return mlp
@@ -210,6 +216,7 @@ class MLP(BaseRepresentation):
             "init_scale": self.init_scale,
             "color_space": self.color_space,
             "use_scale": self.use_scale,
+            "disable_bias": self.disable_bias,
             "state_dict": self.state_dict(),
         }
         torch.save(checkpoint, file_path)
