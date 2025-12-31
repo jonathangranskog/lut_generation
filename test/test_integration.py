@@ -58,6 +58,34 @@ def test_config_bw_clip(temp_dir):
     return config_path
 
 
+@pytest.fixture
+def test_config_mlp_clip(temp_dir):
+    """Create a test config for MLP CLIP with minimal steps."""
+    config_path = temp_dir / "test_mlp_clip.json"
+    config = {
+        "representation": "mlp",
+        "image_text_loss_type": "clip",
+        "loss_weights": {
+            "image_text": 1.0,
+            "image_smoothness": 1.0,
+            "image_regularization": 1.0,
+            "black_preservation": 1.0,
+            "repr_smoothness": 0.0001,
+        },
+        "representation_args": {
+            "num_layers": 2,
+            "hidden_width": 64,
+            "init_scale": 0.01,
+        },
+        "steps": 5,
+        "learning_rate": 0.001,
+        "batch_size": 4,
+    }
+    with open(config_path, "w") as f:
+        json.dump(config, f)
+    return config_path
+
+
 @pytest.mark.integration
 class TestOptimizeWorkflow:
     """Integration tests for the optimize command."""
@@ -99,6 +127,52 @@ class TestOptimizeWorkflow:
         assert lut_tensor.shape == (16, 16, 16, 3)
         assert lut_tensor.min() >= 0.0
         assert lut_tensor.max() <= 1.0
+
+    @pytest.mark.slow
+    def test_optimize_mlp_basic(
+        self, sample_image_folder, temp_dir, test_config_mlp_clip
+    ):
+        """Test basic MLP optimization workflow with minimal steps."""
+        output_mlp = temp_dir / "test_mlp.pt"
+
+        cmd = [
+            "python",
+            "main.py",
+            "optimize",
+            "--prompt",
+            "warm sunset",
+            "--image-folder",
+            str(sample_image_folder),
+            "--config",
+            str(test_config_mlp_clip),
+            "--log-interval",
+            "0",
+            "--output-path",
+            str(output_mlp),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        assert result.returncode == 0, f"Command failed: {result.stderr}"
+        assert output_mlp.exists(), "Output MLP file not created"
+
+        # Verify MLP can be loaded and applied
+        from representations import MLP
+
+        mlp = MLP.read(str(output_mlp))
+        assert mlp.num_layers == 2
+        assert mlp.hidden_width == 64
+
+        # Test that forward pass works
+        test_input = torch.rand(1, 3, 32, 32)
+        with torch.no_grad():
+            output = mlp(test_input)
+        assert output.shape == test_input.shape
+        # MLP uses residual connections so output may slightly exceed [0,1]
+        # Just verify values are reasonable (not NaN/Inf and roughly in range)
+        assert torch.isfinite(output).all()
+        assert output.min() >= -0.5
+        assert output.max() <= 1.5
 
     def test_optimize_validates_empty_folder(self, temp_dir, test_config_color_clip):
         """Test that optimize rejects empty image folders."""

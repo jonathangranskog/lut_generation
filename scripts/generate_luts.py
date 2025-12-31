@@ -22,6 +22,7 @@ from typing_extensions import Annotated
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from representations import MLP
 from utils.config import Config, load_config
 from utils.io import load_image_as_tensor, read_cube_file
 from utils.transforms import apply_lut
@@ -254,6 +255,26 @@ def apply_lut_to_test_image(
         print(f"  WARNING: Failed to apply LUT to test image: {e}")
 
 
+def apply_mlp_to_test_image(
+    mlp_path: Path, test_image_path: Path, output_path: Path
+) -> None:
+    """Apply an MLP to a test image and save the result."""
+    import torch
+
+    try:
+        mlp = MLP.read(str(mlp_path))
+        mlp.eval()
+        image_tensor = load_image_as_tensor(str(test_image_path))
+        with torch.no_grad():
+            result = mlp(image_tensor, training=False)
+        result_np = (result.permute(1, 2, 0).cpu().numpy() * 255).astype("uint8")
+        result_img = Image.fromarray(result_np)
+        result_img.save(output_path)
+        print(f"  Saved test image result: {output_path}")
+    except Exception as e:
+        print(f"  WARNING: Failed to apply MLP to test image: {e}")
+
+
 def generate_lut(
     prompt: str,
     is_grayscale: bool,
@@ -266,16 +287,23 @@ def generate_lut(
     dry_run: bool = False,
 ) -> bool:
     """
-    Generate a single LUT using main.py optimize command.
+    Generate a single LUT or MLP using main.py optimize command.
     Creates a temporary config file with the appropriate representation type.
     Returns True if successful.
     """
-    output_path = output_dir / f"{sanitize_filename(prompt)}.cube"
+    # Check if using MLP representation
+    is_mlp = base_config.representation == "mlp"
 
-    # Determine representation type based on is_grayscale
-    representation = "bw_lut" if is_grayscale else "lut"
+    if is_mlp:
+        # MLP representation - use .pt extension
+        output_path = output_dir / f"{sanitize_filename(prompt)}.pt"
+        representation = "mlp"
+    else:
+        # LUT representation - use .cube extension
+        output_path = output_dir / f"{sanitize_filename(prompt)}.cube"
+        representation = "bw_lut" if is_grayscale else "lut"
 
-    # Create a modified config for this LUT
+    # Create a modified config for this run
     config = Config(
         representation=representation,
         image_text_loss_type=base_config.image_text_loss_type,
@@ -318,7 +346,7 @@ def generate_lut(
         return True
 
     print(f"\n{'=' * 80}")
-    print(f"Generating LUT: {prompt}")
+    print(f"Generating: {prompt}")
     print(f"Representation: {representation}")
     print(f"Steps: {steps}")
     print(f"Output: {output_path}")
@@ -333,13 +361,17 @@ def generate_lut(
             config=config,
         )
 
+        # Handle test image based on representation type
         if test_image:
             test_output_path = output_path.with_suffix(".png")
-            apply_lut_to_test_image(output_path, test_image, test_output_path)
+            if is_mlp:
+                apply_mlp_to_test_image(output_path, test_image, test_output_path)
+            else:
+                apply_lut_to_test_image(output_path, test_image, test_output_path)
 
         return True
     except subprocess.CalledProcessError as e:
-        print(f"ERROR: Failed to generate LUT for '{prompt}': {e}")
+        print(f"ERROR: Failed to generate for '{prompt}': {e}")
         return False
     finally:
         tmp_config_path.unlink(missing_ok=True)
@@ -415,6 +447,9 @@ def main(
 
       # Use a different config
       python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/color_sds.json
+
+      # Generate using MLP config
+      python scripts/generate_luts.py --image-folder images/ --sample 10 --config configs/mlp_clip.json
     """
     if seed:
         random.seed(seed)
@@ -422,8 +457,11 @@ def main(
     # Load base config
     base_config = load_config(config)
     print(f"Loaded config from: {config}")
+    print(f"  Representation: {base_config.representation}")
     print(f"  Model type: {base_config.image_text_loss_type}")
     print(f"  Batch size: {base_config.batch_size}")
+    if base_config.representation == "mlp":
+        print(f"  MLP args: {base_config.representation_args}")
 
     # Parse steps range (use config default if not specified)
     if steps is None:

@@ -24,7 +24,7 @@ from typing_extensions import Annotated
 from models.clip import CLIPLoss
 from models.sds import SDSLoss
 from models.vlm import VLMLoss
-from representations import LUT, BWLUT
+from representations import LUT, BWLUT, MLP
 from utils import (
     CLIP_IMAGE_SIZE,
     DEEPFLOYD_IMAGE_SIZE,
@@ -237,6 +237,8 @@ def optimize(
     # Create representation (trainable!)
     if cfg.representation == "bw_lut":
         representation = BWLUT(**cfg.representation_args).to(device)
+    elif cfg.representation == "mlp":
+        representation = MLP(**cfg.representation_args).to(device)
     else:
         representation = LUT(**cfg.representation_args).to(device)
 
@@ -363,20 +365,23 @@ def infer(
     output_path: str = "output.png",
 ) -> None:
     """
-    Apply a LUT to an image.
+    Apply a representation (LUT or MLP) to an image.
     """
 
     # some error checking
     if not os.path.exists(ckpt_path):
-        raise FileNotFoundError(f"LUT file not found: {ckpt_path}")
+        raise FileNotFoundError(f"Checkpoint file not found: {ckpt_path}")
     if not os.path.exists(image):
         raise FileNotFoundError(f"Image file not found: {image}")
 
     # Select device (MPS is fine for inference)
     device = get_device(allow_mps=True)
 
-    # Load representation from file
-    representation = LUT.read(ckpt_path)
+    # Load representation from file based on extension
+    if ckpt_path.endswith(".pt") or ckpt_path.endswith(".pth"):
+        representation = MLP.read(ckpt_path)
+    else:
+        representation = LUT.read(ckpt_path)
     representation = representation.to(device)
 
     # Load and prepare image
