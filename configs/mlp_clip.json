@@ -11,7 +11,8 @@
   "representation_args": {
     "num_layers": 2,
     "hidden_width": 128,
-    "init_scale": 0.01
+    "init_scale": 0.01,
+    "color_space": "lab"
   },
   "steps": 500,
   "learning_rate": 0.001,
